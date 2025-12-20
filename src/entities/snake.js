@@ -167,6 +167,7 @@ export class Snake {
         // 1. 预检杠 (加杠或暗杠)
         let isKong = false;
         let kakanGroupId = null;
+        let isAnkan = false;
         let ankanTiles = [];
 
         if (!skipInternalDetection) {
