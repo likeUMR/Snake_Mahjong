@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { Snake } from '../entities/snake.js';
 import { Food } from '../entities/food.js';
-import { DiscardUI } from '../ui/ui.js';
+import { DiscardUI, TutorialUI } from '../ui/ui.js';
 import { getSafeRandomPosition } from './utils.js';
 import { checkPotentialCollision } from '../logic/collisionLogic.js';
 import { AIController } from '../ai/AIController.js';
@@ -41,6 +41,7 @@ class Game {
         this.isGameOver = false;
         this.winner = null;
         this.discardUI = new DiscardUI();
+        this.tutorialUI = new TutorialUI();
         
         this.lastTime = 0;
 
@@ -359,6 +360,7 @@ class Game {
         this.ctx.restore();
         
         this.discardUI.draw(this.ctx, this.canvas, this.snake.tiles, this.uiScale);
+        this.tutorialUI.draw(this.ctx, this.uiScale);
         
         this.drawLeaderboard();
         

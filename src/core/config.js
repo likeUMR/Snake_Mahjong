@@ -60,6 +60,12 @@ export const CONFIG = {
     GHOST_DURATION: 3000, // ms (for Phase 6, but good to have now)
     LABEL_FLOAT_HEIGHT: 0.1, // 以格子高度为单位，向上浮动的高度
 
+    // --- 教程 UI 设置 ---
+    TUTORIAL_UI_PADDING: 15,
+    TUTORIAL_UI_FONT_SIZE: 16,
+    TUTORIAL_UI_LINE_HEIGHT: 25,
+    TUTORIAL_UI_TEXT_COLOR: '#ffffff',
+
     // --- 游戏结束 UI 设置 ---
     END_SCREEN_TITLE_SIZE: 100, // 基础标题大小 (px)
     END_SCREEN_SUBTITLE_SIZE: 40, // 基础副标题大小 (px)

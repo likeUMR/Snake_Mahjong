@@ -122,3 +122,38 @@ export class DiscardUI {
         return false;
     }
 }
+
+export class TutorialUI {
+    constructor() {
+        this.lines = [
+            '教程：',
+            'wasd控制移动',
+            '通过碰撞达成吃、碰、杠、胡',
+            '任意玩家胡牌则游戏结束'
+        ];
+    }
+
+    draw(ctx, uiScale = 1) {
+        const s = uiScale;
+        const padding = CONFIG.TUTORIAL_UI_PADDING * s;
+        const fontSize = CONFIG.TUTORIAL_UI_FONT_SIZE * s;
+        const lineHeight = CONFIG.TUTORIAL_UI_LINE_HEIGHT * s;
+        
+        const x = padding;
+        const y = padding;
+
+        // Text
+        ctx.fillStyle = CONFIG.TUTORIAL_UI_TEXT_COLOR;
+        // 使用 Monospace 字体以获得更清晰、更有游戏感的像素效果
+        ctx.font = `bold ${fontSize}px "Consolas", "Monaco", "Courier New", monospace`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        
+        this.lines.forEach((line, index) => {
+            // 确保坐标为整数以获得最清晰的像素效果
+            const lineX = Math.round(x);
+            const lineY = Math.round(y + index * lineHeight);
+            ctx.fillText(line, lineX, lineY);
+        });
+    }
+}
