@@ -1,9 +1,10 @@
 import { CONFIG } from '../core/config.js';
 import { sortTiles, canHu } from '../logic/mahjongLogic.js';
 import { assetManager } from '../core/utils.js';
+import { audioManager } from '../core/audio.js';
 
 export class Snake {
-    constructor(x, y, color = '#2c3e50') {
+    constructor(x, y, color = '#2c3e50', roleIndex = 0) {
         this.body = [
             { x: x, y: y },
             { x: x - 1, y: y },
@@ -15,10 +16,14 @@ export class Snake {
         this.nextDirection = { x: 1, y: 0 };
         this.color = color;
         
+        this.roleIndex = roleIndex; // 0: Player, 1: AI1, 2: AI2, 3: AI3
+        this.voiceRole = CONFIG.AUDIO_CHARACTERS[roleIndex];
+
         this.moveTimer = 0;
         this.speed = CONFIG.INITIAL_SNAKE_SPEED;
         this.needsSort = false;
         this.isWin = false;
+        this.winResult = null; // 存储胡牌详情 { patterns, score }
         this.stunTimer = 0;
         this.isStunned = false;
         this.isGhost = false;
@@ -29,6 +34,7 @@ export class Snake {
         this.ironGroupCount = 0; 
         this.pendingShrink = 0; // 开发阶段 10：待缩短的长度
         this.score = 0; // 开发阶段 11：玩家分数
+        this.needsSafeTurn = false; // 眩晕结束后是否需要安全转向
         
         // 渲染辅助：记录本帧哪些牌需要高亮边框 { index: color }
         this.highlights = {};
@@ -38,10 +44,15 @@ export class Snake {
         return CONFIG.MAX_SNAKE_TILES + this.maxTilesBonus;
     }
 
+    playVoice(actionType) {
+        audioManager.playVoice(this.roleIndex, actionType);
+    }
+
     stun(shouldGhostAfter = false) {
         this.isStunned = true;
         this.stunTimer = CONFIG.STUN_DURATION;
         this.shouldGhostAfterStun = shouldGhostAfter;
+        this.playVoice('xuanyun');
     }
 
     enterGhostMode() {
@@ -60,14 +71,6 @@ export class Snake {
         return lostTile;
     }
 
-    forceTurn() {
-        const directions = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }];
-        const perpendiculars = directions.filter(d => d.x * this.direction.x === 0 && d.y * this.direction.y === 0);
-        const newDir = perpendiculars[Math.floor(Math.random() * perpendiculars.length)];
-        this.nextDirection = newDir;
-        this.direction = newDir; 
-    }
-
     handleInput(key) {
         switch (key.toLowerCase()) {
             case 'w': if (this.direction.y === 0) this.nextDirection = { x: 0, y: -1 }; break;
@@ -82,6 +85,7 @@ export class Snake {
             this.stunTimer -= deltaTime;
             if (this.stunTimer <= 0) {
                 this.isStunned = false;
+                this.needsSafeTurn = true; 
                 if (this.shouldGhostAfterStun) {
                     this.enterGhostMode();
                     this.shouldGhostAfterStun = false;
@@ -103,13 +107,10 @@ export class Snake {
 
     getPotentialHead() {
         this.direction = this.nextDirection;
-        let headX = this.body[0].x + this.direction.x;
-        let headY = this.body[0].y + this.direction.y;
-        if (headX < 0) headX = CONFIG.SCENE_GRID_WIDTH - 1;
-        else if (headX >= CONFIG.SCENE_GRID_WIDTH) headX = 0;
-        if (headY < 0) headY = CONFIG.SCENE_GRID_HEIGHT - 1;
-        else if (headY >= CONFIG.SCENE_GRID_HEIGHT) headY = 0;
-        return { x: headX, y: headY };
+        return { 
+            x: this.body[0].x + this.direction.x, 
+            y: this.body[0].y + this.direction.y 
+        };
     }
 
     executeMove(nextHead) {
@@ -129,7 +130,11 @@ export class Snake {
             this.pendingShrink--;
         }
 
-        if (canHu(this.tiles, this.getMaxTiles())) this.isWin = true;
+        const huResult = canHu(this.tiles, this.getMaxTiles());
+        if (huResult) {
+            this.isWin = true;
+            this.winResult = huResult;
+        }
     }
 
     sortBodyTiles() {
@@ -203,6 +208,7 @@ export class Snake {
         });
         if (isKong) this.maxTilesBonus += 1;
         this.needsSort = true;
+        this.playVoice('fulu');
     }
 
     discardTile(mahjongIndex) {

@@ -6,16 +6,17 @@ export class DiscardUI {
         this.uiTiles = []; // To store rects for click detection
     }
 
-    draw(ctx, canvas, snakeTiles) {
+    draw(ctx, canvas, snakeTiles, uiScale = 1) {
         const tiles = snakeTiles.filter(t => t !== null);
         if (tiles.length === 0) {
             this.uiTiles = [];
             return;
         }
 
-        const tileUIWidth = CONFIG.DISCARD_UI_WIDTH;
-        const tileUIHeight = CONFIG.DISCARD_UI_HEIGHT;
-        const spacing = CONFIG.DISCARD_UI_SPACING;
+        const s = uiScale;
+        const tileUIWidth = CONFIG.DISCARD_UI_WIDTH * s;
+        const tileUIHeight = CONFIG.DISCARD_UI_HEIGHT * s;
+        const spacing = CONFIG.DISCARD_UI_SPACING * s;
         
         // Group tiles: iron groups first, then others
         const ironGroups = [];
@@ -43,13 +44,13 @@ export class DiscardUI {
         const screenHeight = canvas.height / (window.devicePixelRatio || 1);
 
         const startX = (screenWidth - totalWidth) / 2;
-        const startY = screenHeight - tileUIHeight - 30;
+        const startY = screenHeight - tileUIHeight - 30 * s;
 
         // Draw background panel
         ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
         ctx.beginPath();
-        const padding = 15;
-        ctx.roundRect(startX - padding, startY - padding, totalWidth + padding * 2, tileUIHeight + padding * 2, 15);
+        const padding = 15 * s;
+        ctx.roundRect(startX - padding, startY - padding, totalWidth + padding * 2, tileUIHeight + padding * 2, 15 * s);
         ctx.fill();
 
         this.uiTiles = []; // Reset
@@ -65,7 +66,7 @@ export class DiscardUI {
                 const originalIndex = tiles.indexOf(tile);
                 this.uiTiles.push({ x, y, width: tileUIWidth, height: tileUIHeight, tileIndex: originalIndex, isIron: true });
 
-                this.drawSingleTile(ctx, x, y, tileUIWidth, tileUIHeight, tile);
+                this.drawSingleTile(ctx, x, y, tileUIWidth, tileUIHeight, tile, s);
             });
             currentX += group.length * tileUIWidth + spacing;
         });
@@ -78,43 +79,28 @@ export class DiscardUI {
             const originalIndex = tiles.indexOf(tile);
             this.uiTiles.push({ x, y, width: tileUIWidth, height: tileUIHeight, tileIndex: originalIndex, isIron: false });
 
-            this.drawSingleTile(ctx, x, y, tileUIWidth, tileUIHeight, tile);
+            this.drawSingleTile(ctx, x, y, tileUIWidth, tileUIHeight, tile, s);
             currentX += tileUIWidth + spacing;
         });
     }
 
-    drawSingleTile(ctx, x, y, width, height, tile) {
+    drawSingleTile(ctx, x, y, width, height, tile, s = 1) {
         // Draw tile background
         ctx.fillStyle = tile.isIron ? '#bdc3c7' : 'rgba(255, 255, 255, 0.8)';
         ctx.beginPath();
-        ctx.roundRect(x, y, width, height, 5);
+        ctx.roundRect(x, y, width, height, 5 * s);
         ctx.fill();
         ctx.strokeStyle = '#333';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1 * s;
         ctx.stroke();
 
         // 绘制 SVG 背景图 (开发阶段 10 优化)
         const img = assetManager.getTileImage(tile);
         if (img && img.complete && img.naturalWidth !== 0) {
-            const padding = 10;
+            const padding = 10 * s;
             ctx.drawImage(img, x + padding, y + padding, width - padding * 2, height - padding * 2);
         } else if (tile.value === '白' && tile.type === CONFIG.MAHJONG_TYPES.YUAN) {
             // 白板保持空白
-        } else {
-            // 降级方案显示文字
-            /*
-            ctx.fillStyle = '#000';
-            ctx.font = '16px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            let label = tile.value;
-            if (tile.type === CONFIG.MAHJONG_TYPES.WAN) label += '万';
-            else if (tile.type === CONFIG.MAHJONG_TYPES.TIAO) label += '条';
-            else if (tile.type === CONFIG.MAHJONG_TYPES.BING) label += '饼';
-            
-            ctx.fillText(label, x + width / 2, y + height / 2);
-            */
         }
     }
 

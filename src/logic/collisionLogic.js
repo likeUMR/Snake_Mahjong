@@ -9,6 +9,12 @@ import { CONFIG } from '../core/config.js';
  * @returns {null | {type: 'head'|'body', target: Snake, bodyIndex?: number}}
  */
 export function checkPotentialCollision(snakeA, nextHead, allSnakes) {
+    // 1. 边界检查 (Map Edge as Wall)
+    if (nextHead.x < 0 || nextHead.x >= CONFIG.SCENE_GRID_WIDTH || 
+        nextHead.y < 0 || nextHead.y >= CONFIG.SCENE_GRID_HEIGHT) {
+        return { type: 'wall' };
+    }
+
     // 如果 A 处于虚化状态，不主动触发碰撞
     if (snakeA.isGhost) return null;
 

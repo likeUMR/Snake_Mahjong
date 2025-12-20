@@ -22,12 +22,12 @@ export const CONFIG = {
     AI_STATE_WANDER_TIME: 1000, // 游走状态持续时间 (ms)
     AI_STATE_CHASE_TIME: 3000,  // 追逐状态最长时间 (ms)
     AI_STATE_ESCAPE_TIME: 3000, // 逃跑状态最长时间 (ms)
-    AI_FOV_RADIUS: 8,           // AI 视野半径（格子数）
+    AI_STATE_FORAGE_TIME: 2000, // 觅食状态最长时间 (ms)
     
     // Discard UI settings
-    DISCARD_UI_WIDTH: 90,       // 单张牌宽度
-    DISCARD_UI_HEIGHT: 120,      // 单张牌高度
-    DISCARD_UI_SPACING: 24,     // 牌间距
+    DISCARD_UI_WIDTH: 60,       // 单张牌宽度
+    DISCARD_UI_HEIGHT: 80,      // 单张牌高度
+    DISCARD_UI_SPACING: 16,     // 牌间距
     
     // Action Tip Colors
     COLOR_CHOW: '#3498db',      // 吃 - 蓝色
@@ -58,7 +58,7 @@ export const CONFIG = {
 
     // Camera settings
     CAMERA_FOLLOW_SPEED: 0.1, // Smooth follow interpolation factor
-    CAMERA_VERTICAL_FOV: 15, // Number of vertical grids to show
+    CAMERA_VERTICAL_FOV: 13, // Number of vertical grids to show
     
     // Food settings
     MAX_FOOD_COUNT: 18,
@@ -70,6 +70,31 @@ export const CONFIG = {
         BING: 'bing',
         FENG: 'feng', // 东 南 西 北
         YUAN: 'yuan'  // 中 发 白
-    }
+    },
+    // --- 音频设置 ---
+    AUDIO_BGM_PATH: 'Music_and_Sound_Effect/Background_Music/',
+    AUDIO_VOICE_PATH: 'Music_and_Sound_Effect/Voice/', // 弃用，改用角色文件夹直接路径
+    AUDIO_BASE_PATH: 'Music_and_Sound_Effect/',
+    BGM_FADE_DURATION: 1000, // 缩短淡入淡出，增加响应感
+    
+    // 角色文件夹映射 (0: 玩家, 1-3: AI)
+    AUDIO_CHARACTERS: [
+        '一姬',
+        '二阶堂美树',
+        '三上千织',
+        '藤田加奈'
+    ],
+    
+    // 动作与文件名映射
+    AUDIO_VOICE_MAP: {
+        'chow': 'act_chi',
+        'pung': 'act_pon',
+        'kong': 'act_kan',
+        'hu_ron': 'act_ron',
+        'hu_tsumo': 'act_tumo',
+        'eat_food': 'eat_food',
+        'fulu': 'fulu',
+        'xuanyun': 'xuanyun'
+    },
 };
 

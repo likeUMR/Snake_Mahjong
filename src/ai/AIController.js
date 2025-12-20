@@ -1,5 +1,6 @@
 import { CONFIG } from '../core/config.js';
 import { canKong, canPung, canChow, recommendDiscardTile, getRobberyAction } from '../logic/mahjongLogic.js';
+import { checkPotentialCollision } from '../logic/collisionLogic.js';
 
 export const AI_STATE = {
     WANDER: 'wander',
@@ -42,6 +43,9 @@ export class AIController {
     update(deltaTime, allSnakes, allFoods, game) {
         if (this.snake.isStunned) return;
 
+        this.allSnakes = allSnakes;
+        this.game = game;
+
         // 开发阶段 10：AI 弃牌逻辑
         this.checkAutoDiscard();
 
@@ -64,16 +68,6 @@ export class AIController {
             // 每一帧都执行移动计算，以实现更灵敏的追踪效果
             // 此时 aiTurnTimer 不会增加，实现了离开游走状态时“暂停”计时器的效果
             this.executeMovement();
-        }
-        
-        // 即将撞墙检测 (Edge avoidance)
-        const head = this.snake.body[0];
-        const nextX = head.x + this.snake.direction.x;
-        const nextY = head.y + this.snake.direction.y;
-        
-        if (nextX < 0 || nextX >= CONFIG.SCENE_GRID_WIDTH || 
-            nextY < 0 || nextY >= CONFIG.SCENE_GRID_HEIGHT) {
-            this.makeAIRandomMove();
         }
     }
 
@@ -101,8 +95,12 @@ export class AIController {
                 }
                 break;
             case AI_STATE.FORAGE:
-                // 觅食状态在吃到目标或目标消失后退回游走
-                if (!this.isTargetValid(allSnakes, allFoods)) {
+                // 觅食状态在达到持续时间后，重新进行状态判断
+                if (this.stateTimer >= CONFIG.AI_STATE_FORAGE_TIME) {
+                    this.stateTimer = 0;
+                    this.evaluateState(allSnakes, allFoods, game);
+                } else if (!this.isTargetValid(allSnakes, allFoods)) {
+                    // 如果目标消失（被吃掉），退回游走
                     this.state = AI_STATE.WANDER;
                     this.stateTimer = 0;
                     this.target = null;
@@ -116,6 +114,7 @@ export class AIController {
 
     evaluateState(allSnakes, allFoods, game) {
         const head = this.snake.body[0];
+        const fovRadius = Math.ceil(CONFIG.CAMERA_VERTICAL_FOV / 2);
 
         // 1. 检查视野内是否有可掠夺的目标 (Chase)
         let closestChase = null;
@@ -128,7 +127,7 @@ export class AIController {
             for (let i = 1; i < other.body.length; i++) {
                 const part = other.body[i];
                 const dist = this.getDist(head, part);
-                if (dist <= CONFIG.AI_FOV_RADIUS) {
+                if (dist <= fovRadius) {
                     const tile = other.tiles[i];
                     if (!tile || tile.isIron) continue;
 
@@ -168,7 +167,7 @@ export class AIController {
                 if (!myTile || myTile.isIron) continue;
 
                 const distToOtherHead = this.getDist(other.body[0], myPart);
-                if (distToOtherHead <= CONFIG.AI_FOV_RADIUS) {
+                if (distToOtherHead <= fovRadius) {
                     const isOtherFull = other.tiles.filter(t => t !== null).length >= other.getMaxTiles();
                     const isOtherShangJia = game.checkIsShangJia(other, this.snake);
                     const action = getRobberyAction(other.tiles, myTile, isOtherShangJia, isOtherFull);
@@ -199,7 +198,7 @@ export class AIController {
 
         for (const food of allFoods) {
             const dist = this.getDist(head, { x: food.gridX, y: food.gridY });
-            if (dist <= CONFIG.AI_FOV_RADIUS && dist < minFoodDist) {
+            if (dist <= fovRadius && dist < minFoodDist) {
                 minFoodDist = dist;
                 closestFood = food;
             }
@@ -262,24 +261,18 @@ export class AIController {
 
     moveTowards(pos) {
         const head = this.snake.body[0];
-        // 考虑网格循环的最短位移
         let dx = pos.x - head.x;
         let dy = pos.y - head.y;
-
-        if (Math.abs(dx) > CONFIG.SCENE_GRID_WIDTH / 2) {
-            dx = dx > 0 ? dx - CONFIG.SCENE_GRID_WIDTH : dx + CONFIG.SCENE_GRID_WIDTH;
-        }
-        if (Math.abs(dy) > CONFIG.SCENE_GRID_HEIGHT / 2) {
-            dy = dy > 0 ? dy - CONFIG.SCENE_GRID_HEIGHT : dy + CONFIG.SCENE_GRID_HEIGHT;
-        }
 
         const possibleDirs = [];
         if (dx !== 0) possibleDirs.push({ x: dx > 0 ? 1 : -1, y: 0 });
         if (dy !== 0) possibleDirs.push({ x: 0, y: dy > 0 ? 1 : -1 });
 
-        // 过滤掉掉头方向
+        // 过滤掉掉头方向以及不安全的方向
         const validDirs = possibleDirs.filter(d => {
-            return !(d.x === -this.snake.direction.x && d.y === -this.snake.direction.y);
+            if (d.x === -this.snake.direction.x && d.y === -this.snake.direction.y) return false;
+            const nextH = { x: head.x + d.x, y: head.y + d.y };
+            return !checkPotentialCollision(this.snake, nextH, this.allSnakes);
         });
 
         if (validDirs.length > 0) {
@@ -291,16 +284,8 @@ export class AIController {
 
     moveAwayFrom(pos) {
         const head = this.snake.body[0];
-        // 逃跑也需要考虑网格循环
         let dx = head.x - pos.x;
         let dy = head.y - pos.y;
-
-        if (Math.abs(dx) > CONFIG.SCENE_GRID_WIDTH / 2) {
-            dx = dx > 0 ? dx - CONFIG.SCENE_GRID_WIDTH : dx + CONFIG.SCENE_GRID_WIDTH;
-        }
-        if (Math.abs(dy) > CONFIG.SCENE_GRID_HEIGHT / 2) {
-            dy = dy > 0 ? dy - CONFIG.SCENE_GRID_HEIGHT : dy + CONFIG.SCENE_GRID_HEIGHT;
-        }
 
         const possibleDirs = [];
         if (dx !== 0) possibleDirs.push({ x: dx > 0 ? 1 : -1, y: 0 });
@@ -310,7 +295,9 @@ export class AIController {
         else possibleDirs.push({ x: 0, y: 1 }, { x: 0, y: -1 });
 
         const validDirs = possibleDirs.filter(d => {
-            return !(d.x === -this.snake.direction.x && d.y === -this.snake.direction.y);
+            if (d.x === -this.snake.direction.x && d.y === -this.snake.direction.y) return false;
+            const nextH = { x: head.x + d.x, y: head.y + d.y };
+            return !checkPotentialCollision(this.snake, nextH, this.allSnakes);
         });
 
         if (validDirs.length > 0) {
@@ -328,19 +315,27 @@ export class AIController {
             { x: 1, y: 0 }   // Right
         ];
 
-        const validDirections = directions.filter(d => {
-            return !(d.x === -this.snake.direction.x && d.y === -this.snake.direction.y);
+        const head = this.snake.body[0];
+        const safeDirs = directions.filter(d => {
+            if (d.x === -this.snake.direction.x && d.y === -this.snake.direction.y) return false;
+            const nextH = { x: head.x + d.x, y: head.y + d.y };
+            return !checkPotentialCollision(this.snake, nextH, this.allSnakes);
         });
 
-        const newDir = validDirections[Math.floor(Math.random() * validDirections.length)];
-        this.snake.nextDirection = newDir;
+        if (safeDirs.length > 0) {
+            this.snake.nextDirection = safeDirs[Math.floor(Math.random() * safeDirs.length)];
+        } else {
+            // 如果没有完全安全的方向，至少保证不掉头
+            const fallbackDirs = directions.filter(d => {
+                return !(d.x === -this.snake.direction.x && d.y === -this.snake.direction.y);
+            });
+            this.snake.nextDirection = fallbackDirs[Math.floor(Math.random() * fallbackDirs.length)];
+        }
     }
 
     getDist(p1, p2) {
         let dx = Math.abs(p1.x - p2.x);
         let dy = Math.abs(p1.y - p2.y);
-        if (dx > CONFIG.SCENE_GRID_WIDTH / 2) dx = CONFIG.SCENE_GRID_WIDTH - dx;
-        if (dy > CONFIG.SCENE_GRID_HEIGHT / 2) dy = CONFIG.SCENE_GRID_HEIGHT - dy;
         return Math.sqrt(dx * dx + dy * dy);
     }
 

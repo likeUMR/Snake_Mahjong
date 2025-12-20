@@ -6,6 +6,7 @@ import { getSafeRandomPosition } from './utils.js';
 import { checkPotentialCollision } from '../logic/collisionLogic.js';
 import { AIController } from '../ai/AIController.js';
 import { canHu, getRobberyAction, findBestRobberyFromHand } from '../logic/mahjongLogic.js';
+import { audioManager } from './audio.js';
 
 class Game {
     constructor() {
@@ -17,7 +18,7 @@ class Game {
         this.effects = []; // 暂时的特效文字 [{text, x, y, life}]
         
         const playerPos = getSafeRandomPosition(this.snakes);
-        this.snake = new Snake(playerPos.x, playerPos.y, '#3498db');
+        this.snake = new Snake(playerPos.x, playerPos.y, '#3498db', 0); // Role 0: Player
         this.snakes.push(this.snake);
         
         const aiConfigs = [
@@ -26,9 +27,9 @@ class Game {
             { label: CONFIG.AI_LABELS.SHANG_JIA }
         ];
 
-        aiConfigs.forEach(conf => {
+        aiConfigs.forEach((conf, index) => {
             const pos = getSafeRandomPosition(this.snakes);
-            const aiSnake = new Snake(pos.x, pos.y, '#95a5a6');
+            const aiSnake = new Snake(pos.x, pos.y, '#95a5a6', index + 1); // Role 1, 2, 3
             this.snakes.push(aiSnake);
             this.aiControllers.push(new AIController(aiSnake, conf.label));
         });
@@ -42,6 +43,9 @@ class Game {
         this.discardUI = new DiscardUI();
         
         this.lastTime = 0;
+
+        // 初始化音频系统
+        audioManager.initBgm(['game_master.mp3', 'game.mp3']);
         
         window.addEventListener('keydown', (e) => this.snake.handleInput(e.key));
         window.addEventListener('resize', () => this.resize());
@@ -73,6 +77,8 @@ class Game {
         this.ctx.scale(dpr, dpr);
         
         this.scale = window.innerHeight / (CONFIG.CAMERA_VERTICAL_FOV * CONFIG.TILE_HEIGHT);
+        // 基准值为 4K (2160px)
+        this.uiScale = window.innerHeight / 1080;
     }
 
     spawnFood() {
@@ -105,6 +111,10 @@ class Game {
         if (indexA === -1 || indexB === -1) return false;
         const shangJiaIndex = (indexA - 1 + this.snakes.length) % this.snakes.length;
         return indexB === shangJiaIndex;
+    }
+
+    getWrappedHead(head, dir) {
+        return { x: head.x + dir.x, y: head.y + dir.y };
     }
 
     /**
@@ -155,6 +165,36 @@ class Game {
         // 顺序处理移动
         let anySnakeMoved = false;
         this.snakes.forEach(snake => {
+            // 开发阶段 11 补充：眩晕结束后的安全转向逻辑
+            if (snake.needsSafeTurn) {
+                const head = snake.body[0];
+                const d = snake.direction;
+                // 候选方向优先级：原方向 > 右转 > 左转
+                const candidates = [
+                    d,                        // 1. 原方向
+                    { x: -d.y, y: d.x },      // 2. 右转
+                    { x: d.y, y: -d.x }       // 3. 左转
+                ];
+
+                let bestDir = null;
+                for (const testDir of candidates) {
+                    const nextH = this.getWrappedHead(head, testDir);
+                    if (!checkPotentialCollision(snake, nextH, this.snakes)) {
+                        bestDir = testDir;
+                        break;
+                    }
+                }
+
+                // 如果都不安全，则在三者中随机选一个
+                if (!bestDir) {
+                    bestDir = candidates[Math.floor(Math.random() * candidates.length)];
+                }
+
+                snake.direction = bestDir;
+                snake.nextDirection = bestDir;
+                snake.needsSafeTurn = false;
+            }
+
             if (snake.willMove(deltaTime)) {
                 const nextHead = snake.getPotentialHead();
                 const collision = checkPotentialCollision(snake, nextHead, this.snakes);
@@ -162,13 +202,13 @@ class Game {
                 if (collision) {
                     if (collision.type === 'head') {
                         snake.stun();
-                        snake.forceTurn();
                         collision.target.stun();
-                        collision.target.forceTurn();
+                    } else if (collision.type === 'wall') {
+                        // 撞墙眩晕
+                        snake.stun();
                     } else if (collision.type === 'body') {
                         if (snake === collision.target) {
                             snake.stun(true);
-                            snake.forceTurn();
                         } else {
                             const targetSnake = collision.target;
                             const isShangJia = this.checkIsShangJia(snake, targetSnake);
@@ -188,6 +228,13 @@ class Game {
                                     snake.executeMove(nextHead);
                                     anySnakeMoved = true;
                                     
+                                    // 播放语音
+                                    if (snake.isWin) {
+                                        snake.playVoice('hu_ron');
+                                    } else {
+                                        snake.playVoice(action.type); // 'chow', 'pung', 'kong'
+                                    }
+
                                     // 统一颜色映射
                                     let effectColor = '#f1c40f';
                                     if (action.type === 'kong') {
@@ -204,12 +251,10 @@ class Game {
                                     this.spawnEffect(action.effectText, nextHead.x, nextHead.y, effectColor);
                                 } else {
                                     snake.stun();
-                                    snake.forceTurn();
                                 }
                             } else {
                                 // 对方身上没有任何牌可以被我掠夺，判定撞击失败，我方眩晕
                                 snake.stun();
-                                snake.forceTurn();
                             }
                         }
                     }
@@ -222,6 +267,7 @@ class Game {
                     this.isGameOver = true;
                     this.winner = snake;
                     snake.score += CONFIG.SCORE_HU;
+                    audioManager.playEndSound(snake === this.snake);
                 }
             }
         });
@@ -242,11 +288,15 @@ class Game {
                 const growResult = snake.grow(food.tile);
                 
                 if (growResult) {
-                    if (growResult.type === 'kong') {
+                    if (snake.isWin) {
+                        snake.playVoice('hu_tsumo');
+                    } else if (growResult.type === 'kong') {
                         this.spawnEffect(growResult.effectText, head.x, head.y, CONFIG.COLOR_KONG);
                         snake.score += CONFIG.SCORE_CONCEALED_KONG;
+                        snake.playVoice('kong');
                     } else {
                         snake.score += CONFIG.SCORE_FOOD;
+                        snake.playVoice('eat_food');
                     }
                 }
                 
@@ -290,7 +340,7 @@ class Game {
 
         this.ctx.restore();
         
-        this.discardUI.draw(this.ctx, this.canvas, this.snake.tiles);
+        this.discardUI.draw(this.ctx, this.canvas, this.snake.tiles, this.uiScale);
         
         this.drawLeaderboard();
         
@@ -304,10 +354,11 @@ class Game {
     }
 
     drawLeaderboard() {
-        const padding = CONFIG.LEADERBOARD_PADDING;
-        const width = CONFIG.LEADERBOARD_WIDTH;
-        const entryHeight = CONFIG.LEADERBOARD_ENTRY_HEIGHT;
-        const titleHeight = CONFIG.LEADERBOARD_TITLE_HEIGHT;
+        const s = this.uiScale;
+        const padding = CONFIG.LEADERBOARD_PADDING * s;
+        const width = CONFIG.LEADERBOARD_WIDTH * s;
+        const entryHeight = CONFIG.LEADERBOARD_ENTRY_HEIGHT * s;
+        const titleHeight = CONFIG.LEADERBOARD_TITLE_HEIGHT * s;
         
         // Sort snakes by score
         const sortedSnakes = [...this.snakes].sort((a, b) => b.score - a.score);
@@ -319,35 +370,35 @@ class Game {
         // Background
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         this.ctx.beginPath();
-        this.ctx.roundRect(x, y, width, height, 10);
+        this.ctx.roundRect(x, y, width, height, 10 * s);
         this.ctx.fill();
 
         // Title
         this.ctx.fillStyle = '#f1c40f';
-        this.ctx.font = `bold ${CONFIG.LEADERBOARD_TITLE_FONT_SIZE}px Arial`;
+        this.ctx.font = `bold ${CONFIG.LEADERBOARD_TITLE_FONT_SIZE * s}px Arial`;
         this.ctx.textAlign = 'left';
         this.ctx.textBaseline = 'top';
-        this.ctx.fillText('排行榜 (Leaderboard)', x + 15, y + 15);
+        this.ctx.fillText('排行榜 (Leaderboard)', x + 15 * s, y + 15 * s);
 
         // Entries
-        this.ctx.font = `${CONFIG.LEADERBOARD_ENTRY_FONT_SIZE}px Arial`;
+        this.ctx.font = `${CONFIG.LEADERBOARD_ENTRY_FONT_SIZE * s}px Arial`;
         sortedSnakes.forEach((snake, index) => {
-            const entryY = y + titleHeight + index * entryHeight + 10;
+            const entryY = y + titleHeight + index * entryHeight + 10 * s;
             
             // Marker for current player
             if (snake === this.snake) {
                 this.ctx.fillStyle = '#3498db';
-                this.ctx.fillText('> 你 (You)', x + 15, entryY);
+                this.ctx.fillText('> 你 (You)', x + 15 * s, entryY);
             } else {
                 const controller = this.aiControllers.find(c => c.snake === snake);
                 this.ctx.fillStyle = controller ? controller.label.color : '#fff';
                 const name = controller ? controller.label.text : 'AI';
-                this.ctx.fillText(`${index + 1}. ${name}`, x + 15, entryY);
+                this.ctx.fillText(`${index + 1}. ${name}`, x + 15 * s, entryY);
             }
             
             this.ctx.textAlign = 'right';
             this.ctx.fillStyle = '#fff';
-            this.ctx.fillText(snake.score, x + width - 15, entryY);
+            this.ctx.fillText(snake.score, x + width - 15 * s, entryY);
             this.ctx.textAlign = 'left';
         });
     }
@@ -356,25 +407,35 @@ class Game {
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.fillStyle = '#f1c40f';
-        this.ctx.font = 'bold 60px Arial';
+        this.ctx.font = `bold ${60 * this.uiScale}px Arial`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        this.ctx.fillText('游戏胜利 (VICTORY)', this.canvas.width / 2, this.canvas.height / 2);
-        this.ctx.font = '24px Arial';
-        this.ctx.fillText('你胡牌了！', this.canvas.width / 2, this.canvas.height / 2 + 60);
+        this.ctx.fillText('游戏胜利 (VICTORY)', this.canvas.width / 2, this.canvas.height / 2 - 20 * this.uiScale);
+        
+        this.ctx.font = `${24 * this.uiScale}px Arial`;
+        let winText = '你胡牌了！';
+        if (this.snake.winResult && this.snake.winResult.patterns) {
+            winText += ` [${this.snake.winResult.patterns.join(', ')}]`;
+        }
+        this.ctx.fillText(winText, this.canvas.width / 2, this.canvas.height / 2 + 60 * this.uiScale);
     }
 
     drawDefeat(winnerLabel) {
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.fillStyle = '#e74c3c';
-        this.ctx.font = 'bold 60px Arial';
+        this.ctx.font = `bold ${60 * this.uiScale}px Arial`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
         const labelText = winnerLabel ? winnerLabel.text : 'AI';
-        this.ctx.fillText('游戏失败 (DEFEAT)', this.canvas.width / 2, this.canvas.height / 2);
-        this.ctx.font = '24px Arial';
-        this.ctx.fillText(`${labelText} 胡牌了！`, this.canvas.width / 2, this.canvas.height / 2 + 60);
+        this.ctx.fillText('游戏失败 (DEFEAT)', this.canvas.width / 2, this.canvas.height / 2 - 20 * this.uiScale);
+        
+        this.ctx.font = `${24 * this.uiScale}px Arial`;
+        let winText = `${labelText} 胡牌了！`;
+        if (this.winner && this.winner.winResult && this.winner.winResult.patterns) {
+            winText += ` [${this.winner.winResult.patterns.join(', ')}]`;
+        }
+        this.ctx.fillText(winText, this.canvas.width / 2, this.canvas.height / 2 + 60 * this.uiScale);
     }
 
     drawGrid() {
