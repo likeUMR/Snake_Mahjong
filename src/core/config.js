@@ -1,4 +1,7 @@
 export const CONFIG = {
+    // --- 调试设置 ---
+    DEBUG_MODE: false, // 是否开启调试模式（显示 AI 状态等）
+
     // Grid settings
     TILE_WIDTH: 30,
     TILE_HEIGHT: 40,
@@ -16,7 +19,7 @@ export const CONFIG = {
     AI_MOVE_INTERVAL_MAX: 3000, // ms
     AI_LABELS: {
         XIA_JIA: { text: '下家', color: '#e74c3c' }, // Red
-        DUI_JIA: { text: '对家', color: '#ffffff' }, // White
+        DUI_JIA: { text: '对家', color: '#bdc3c7' }, // Light Gray (was #ffffff)
         SHANG_JIA: { text: '上家', color: '#2ecc71' } // Green
     },
     AI_STATE_WANDER_TIME: 1000, // 游走状态持续时间 (ms)
@@ -30,6 +33,7 @@ export const CONFIG = {
     DISCARD_UI_SPACING: 16,     // 牌间距
     
     // Action Tip Colors
+    COLOR_HU: '#e74c3c',        // 胡 - 红色
     COLOR_CHOW: '#3498db',      // 吃 - 蓝色
     COLOR_PUNG: '#f1c40f',      // 碰 - 黄色
     COLOR_KONG: '#e67e22',      // 杠 - 橙色
@@ -50,11 +54,16 @@ export const CONFIG = {
     SCORE_PUNG: 100,
     SCORE_KONG: 200,
     SCORE_CONCEALED_KONG: 300,
-    SCORE_HU: 500,
+    SCORE_HU: 1000,
 
     STUN_DURATION: 3000, // ms
     GHOST_DURATION: 3000, // ms (for Phase 6, but good to have now)
     LABEL_FLOAT_HEIGHT: 0.1, // 以格子高度为单位，向上浮动的高度
+
+    // --- 游戏结束 UI 设置 ---
+    END_SCREEN_TITLE_SIZE: 100, // 基础标题大小 (px)
+    END_SCREEN_SUBTITLE_SIZE: 40, // 基础副标题大小 (px)
+    END_SCREEN_SCORE_SIZE: 30, // 基础分数列表大小 (px)
 
     // Camera settings
     CAMERA_FOLLOW_SPEED: 0.1, // Smooth follow interpolation factor
@@ -77,6 +86,14 @@ export const CONFIG = {
     AUDIO_BASE_PATH: 'Music_and_Sound_Effect/',
     BGM_FADE_DURATION: 1000, // 缩短淡入淡出，增加响应感
     
+    // --- 声音空间感与音量设置 ---
+    AUDIO_GAIN_BGM: -15,   // 背景音乐增益 (dB)
+    AUDIO_GAIN_VOICE: 0, // 角色语音增益 (dB)
+    AUDIO_GAIN_SFX: 0,   // 通用音效增益 (dB) (吃掉食物, 眩晕等)
+    
+    AUDIO_DISTANCE_MAX: 15, // 声音完全衰减的最大距离 (以格子为单位)
+    AUDIO_DISTANCE_MIN: 2,  // 保持最大音量的最小距离 (以格子为单位)
+    
     // 角色文件夹映射 (0: 玩家, 1-3: AI)
     AUDIO_CHARACTERS: [
         '一姬',
@@ -92,6 +109,7 @@ export const CONFIG = {
         'kong': 'act_kan',
         'hu_ron': 'act_ron',
         'hu_tsumo': 'act_tumo',
+        'game_top': 'game_top', // 增加 game_top 映射
         'eat_food': 'eat_food',
         'fulu': 'fulu',
         'xuanyun': 'xuanyun'

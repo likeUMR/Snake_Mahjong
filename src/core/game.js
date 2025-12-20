@@ -46,10 +46,15 @@ class Game {
 
         // 初始化音频系统
         audioManager.initBgm(['game_master.mp3', 'game.mp3']);
+        audioManager.setListener(this.snake); // 设置玩家为监听者
         
-        window.addEventListener('keydown', (e) => this.snake.handleInput(e.key));
+        window.addEventListener('keydown', (e) => {
+            audioManager.resumeAudio();
+            this.snake.handleInput(e.key);
+        });
         window.addEventListener('resize', () => this.resize());
         this.canvas.addEventListener('mousedown', (e) => {
+            audioManager.resumeAudio();
             if (this.isGameOver) return;
             this.discardUI.handleMouseDown(e, this.canvas, (index) => {
                 this.snake.discardTile(index);
@@ -88,7 +93,7 @@ class Game {
             const onSnake = this.snakes.some(snake => 
                 snake.body.some(p => p.x === x && p.y === y)
             );
-            const onFood = this.foods.some(f => f.gridX === x && f.gridY === f.gridY && f.gridX === x && f.gridY === y);
+            const onFood = this.foods.some(f => f.gridX === x && f.gridY === y);
             if (!onSnake && !onFood) {
                 this.foods.push(new Food(x, y));
             }
@@ -128,14 +133,16 @@ class Game {
 
             const isShangJia = this.checkIsShangJia(this.snake, targetSnake);
             const isAttackerFull = this.snake.tiles.filter(t => t !== null).length >= this.snake.getMaxTiles();
+            const attackerMaxTiles = this.snake.getMaxTiles();
             
             for (let i = 1; i < targetSnake.tiles.length; i++) {
                 const tile = targetSnake.tiles[i];
                 // 使用统一判定入口
-                const action = getRobberyAction(this.snake.tiles, tile, isShangJia, isAttackerFull);
+                const action = getRobberyAction(this.snake.tiles, tile, isShangJia, isAttackerFull, attackerMaxTiles);
                 
                 if (action) {
-                    if (action.type === 'kong') targetSnake.highlights[i] = CONFIG.COLOR_KONG;
+                    if (action.type === 'hu') targetSnake.highlights[i] = CONFIG.COLOR_HU;
+                    else if (action.type === 'kong') targetSnake.highlights[i] = CONFIG.COLOR_KONG;
                     else if (action.type === 'pung') targetSnake.highlights[i] = CONFIG.COLOR_PUNG;
                     else if (action.type === 'chow') targetSnake.highlights[i] = CONFIG.COLOR_CHOW;
                 }
@@ -213,31 +220,37 @@ class Game {
                             const targetSnake = collision.target;
                             const isShangJia = this.checkIsShangJia(snake, targetSnake);
                             const isAttackerFull = snake.tiles.filter(t => t !== null).length >= snake.getMaxTiles();
+                            const attackerMaxTiles = snake.getMaxTiles();
 
                             // 核心修改：不再只检查 collision.bodyIndex 对应的牌
-                            // 而是扫描对方全手牌，寻找符合“杠 > 碰 > 吃”优先级的第一个动作
-                            const action = findBestRobberyFromHand(snake.tiles, targetSnake.tiles, isShangJia, isAttackerFull);
+                            // 顺次扫描对方全手牌，寻找符合“胡 > 杠 > 碰 > 吃”优先级的第一个动作
+                            const action = findBestRobberyFromHand(snake.tiles, targetSnake.tiles, isShangJia, isAttackerFull, attackerMaxTiles);
 
                             if (action) {
                                 // 掠夺成功逻辑：根据 action.tileIndex 移除对应的牌
                                     const robbedTile = targetSnake.loseTile(action.tileIndex);
                                 if (robbedTile) {
-                                    snake.grow(robbedTile);
-                                    snake.hardenTiles([...action.involvedTiles, robbedTile], action.isKong);
+                                    snake.grow(robbedTile, true);
+
+                                    // 如果是胡牌掠夺，不需要 harden，但需要记录结果
+                                    if (action.type === 'hu') {
+                                        snake.isWin = true;
+                                        snake.winResult = action.winResult;
+                                        snake.playVoice('hu_ron');
+                                    } else {
+                                        snake.hardenTiles([...action.involvedTiles, robbedTile], action.isKong);
+                                        snake.playVoice(action.type);
+                                    }
+
                                     targetSnake.enterGhostMode();
                                     snake.executeMove(nextHead);
                                     anySnakeMoved = true;
                                     
-                                    // 播放语音
-                                    if (snake.isWin) {
-                                        snake.playVoice('hu_ron');
-                                    } else {
-                                        snake.playVoice(action.type); // 'chow', 'pung', 'kong'
-                                    }
-
                                     // 统一颜色映射
                                     let effectColor = '#f1c40f';
-                                    if (action.type === 'kong') {
+                                    if (action.type === 'hu') {
+                                        effectColor = CONFIG.COLOR_HU;
+                                    } else if (action.type === 'kong') {
                                         effectColor = CONFIG.COLOR_KONG;
                                         snake.score += CONFIG.SCORE_KONG;
                                     } else if (action.type === 'pung') {
@@ -292,7 +305,8 @@ class Game {
                         snake.playVoice('hu_tsumo');
                     } else if (growResult.type === 'kong') {
                         this.spawnEffect(growResult.effectText, head.x, head.y, CONFIG.COLOR_KONG);
-                        snake.score += CONFIG.SCORE_CONCEALED_KONG;
+                        const kongScore = growResult.isConcealed ? CONFIG.SCORE_CONCEALED_KONG : CONFIG.SCORE_KONG;
+                        snake.score += kongScore;
                         snake.playVoice('kong');
                     } else {
                         snake.score += CONFIG.SCORE_FOOD;
@@ -314,9 +328,13 @@ class Game {
     }
 
     draw() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        const dpr = window.devicePixelRatio || 1;
+        const logicalWidth = this.canvas.width / dpr;
+        const logicalHeight = this.canvas.height / dpr;
+
+        this.ctx.clearRect(0, 0, logicalWidth, logicalHeight);
         this.ctx.save();
-        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.translate(logicalWidth / 2, logicalHeight / 2);
         this.ctx.scale(this.scale, this.scale);
         this.ctx.translate(-this.cameraX, -this.cameraY);
         
@@ -354,6 +372,10 @@ class Game {
     }
 
     drawLeaderboard() {
+        const dpr = window.devicePixelRatio || 1;
+        const logicalWidth = this.canvas.width / dpr;
+        const logicalHeight = this.canvas.height / dpr;
+
         const s = this.uiScale;
         const padding = CONFIG.LEADERBOARD_PADDING * s;
         const width = CONFIG.LEADERBOARD_WIDTH * s;
@@ -364,7 +386,7 @@ class Game {
         const sortedSnakes = [...this.snakes].sort((a, b) => b.score - a.score);
         
         const height = titleHeight + sortedSnakes.length * entryHeight + padding;
-        const x = this.canvas.width / (window.devicePixelRatio || 1) - width - padding;
+        const x = logicalWidth - width - padding;
         const y = padding;
 
         // Background
@@ -385,15 +407,16 @@ class Game {
         sortedSnakes.forEach((snake, index) => {
             const entryY = y + titleHeight + index * entryHeight + 10 * s;
             
+            const charName = CONFIG.AUDIO_CHARACTERS[snake.roleIndex] || 'Unknown';
+            
             // Marker for current player
             if (snake === this.snake) {
                 this.ctx.fillStyle = '#3498db';
-                this.ctx.fillText('> 你 (You)', x + 15 * s, entryY);
+                this.ctx.fillText(`> ${charName} (你)`, x + 15 * s, entryY);
             } else {
                 const controller = this.aiControllers.find(c => c.snake === snake);
                 this.ctx.fillStyle = controller ? controller.label.color : '#fff';
-                const name = controller ? controller.label.text : 'AI';
-                this.ctx.fillText(`${index + 1}. ${name}`, x + 15 * s, entryY);
+                this.ctx.fillText(`${index + 1}. ${charName}`, x + 15 * s, entryY);
             }
             
             this.ctx.textAlign = 'right';
@@ -404,38 +427,89 @@ class Game {
     }
 
     drawVictory() {
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        const dpr = window.devicePixelRatio || 1;
+        const logicalWidth = this.canvas.width / dpr;
+        const logicalHeight = this.canvas.height / dpr;
+
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+        
+        const s = this.uiScale;
+        const charName = CONFIG.AUDIO_CHARACTERS[this.winner.roleIndex];
+        
         this.ctx.fillStyle = '#f1c40f';
-        this.ctx.font = `bold ${60 * this.uiScale}px Arial`;
+        this.ctx.font = `bold ${CONFIG.END_SCREEN_TITLE_SIZE * s}px Arial`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        this.ctx.fillText('游戏胜利 (VICTORY)', this.canvas.width / 2, this.canvas.height / 2 - 20 * this.uiScale);
+        this.ctx.fillText(`游戏胜利 (VICTORY)`, logicalWidth / 2, logicalHeight / 2 - 120 * s);
         
-        this.ctx.font = `${24 * this.uiScale}px Arial`;
-        let winText = '你胡牌了！';
-        if (this.snake.winResult && this.snake.winResult.patterns) {
-            winText += ` [${this.snake.winResult.patterns.join(', ')}]`;
+        this.ctx.font = `${CONFIG.END_SCREEN_SUBTITLE_SIZE * s}px Arial`;
+        let winText = `${charName} 胡牌了！`;
+        if (this.winner.winResult && this.winner.winResult.patterns) {
+            let patterns = [...this.winner.winResult.patterns];
+            if (patterns.length > 1) {
+                patterns.shift();
+            }
+            winText += ` [${patterns.join(', ')}]`;
         }
-        this.ctx.fillText(winText, this.canvas.width / 2, this.canvas.height / 2 + 60 * this.uiScale);
+        this.ctx.fillText(winText, logicalWidth / 2, logicalHeight / 2 - 50 * s);
+        
+        this.drawEndScores(logicalWidth, logicalHeight, s);
     }
 
     drawDefeat(winnerLabel) {
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        const dpr = window.devicePixelRatio || 1;
+        const logicalWidth = this.canvas.width / dpr;
+        const logicalHeight = this.canvas.height / dpr;
+
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+        
+        const s = this.uiScale;
+        const charName = CONFIG.AUDIO_CHARACTERS[this.winner.roleIndex];
+
         this.ctx.fillStyle = '#e74c3c';
-        this.ctx.font = `bold ${60 * this.uiScale}px Arial`;
+        this.ctx.font = `bold ${CONFIG.END_SCREEN_TITLE_SIZE * s}px Arial`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        const labelText = winnerLabel ? winnerLabel.text : 'AI';
-        this.ctx.fillText('游戏失败 (DEFEAT)', this.canvas.width / 2, this.canvas.height / 2 - 20 * this.uiScale);
+        this.ctx.fillText('游戏失败 (DEFEAT)', logicalWidth / 2, logicalHeight / 2 - 120 * s);
         
-        this.ctx.font = `${24 * this.uiScale}px Arial`;
-        let winText = `${labelText} 胡牌了！`;
+        this.ctx.font = `${CONFIG.END_SCREEN_SUBTITLE_SIZE * s}px Arial`;
+        this.ctx.fillStyle = '#fff';
+        let winText = `${charName} 胡牌了！`;
         if (this.winner && this.winner.winResult && this.winner.winResult.patterns) {
-            winText += ` [${this.winner.winResult.patterns.join(', ')}]`;
+            let patterns = [...this.winner.winResult.patterns];
+            if (patterns.length > 1) {
+                patterns.shift();
+            }
+            winText += ` [${patterns.join(', ')}]`;
         }
-        this.ctx.fillText(winText, this.canvas.width / 2, this.canvas.height / 2 + 60 * this.uiScale);
+        this.ctx.fillText(winText, logicalWidth / 2, logicalHeight / 2 - 50 * s);
+
+        this.drawEndScores(logicalWidth, logicalHeight, s);
+    }
+
+    drawEndScores(logicalWidth, logicalHeight, s) {
+        const sortedSnakes = [...this.snakes].sort((a, b) => b.score - a.score);
+        const startY = logicalHeight / 2 + 20 * s;
+        const entryHeight = 40 * s;
+        
+        this.ctx.font = `bold ${CONFIG.END_SCREEN_SCORE_SIZE * s}px Arial`;
+        this.ctx.textAlign = 'center';
+        
+        sortedSnakes.forEach((snake, index) => {
+            const charName = CONFIG.AUDIO_CHARACTERS[snake.roleIndex];
+            const isWinner = snake === this.winner;
+            const isPlayer = snake === this.snake;
+            
+            this.ctx.fillStyle = isWinner ? '#f1c40f' : (isPlayer ? '#3498db' : '#fff');
+            let nameText = `${index + 1}. ${charName}`;
+            if (isPlayer) nameText += ' (你)';
+            if (isWinner) nameText += ' ★';
+            
+            const text = `${nameText.padEnd(15)} 分数: ${snake.score}`;
+            this.ctx.fillText(text, logicalWidth / 2, startY + index * entryHeight);
+        });
     }
 
     drawGrid() {

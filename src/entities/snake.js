@@ -45,7 +45,7 @@ export class Snake {
     }
 
     playVoice(actionType) {
-        audioManager.playVoice(this.roleIndex, actionType);
+        audioManager.playVoice(this.roleIndex, actionType, this.body[0]);
     }
 
     stun(shouldGhostAfter = false) {
@@ -130,11 +130,17 @@ export class Snake {
             this.pendingShrink--;
         }
 
+        this.checkWin();
+    }
+
+    checkWin() {
         const huResult = canHu(this.tiles, this.getMaxTiles());
         if (huResult) {
             this.isWin = true;
             this.winResult = huResult;
+            return true;
         }
+        return false;
     }
 
     sortBodyTiles() {
@@ -157,8 +163,42 @@ export class Snake {
         this.tiles = newTiles;
     }
 
-    grow(tile) {
-        if (this.tiles.filter(t => t !== null).length >= this.getMaxTiles()) return null;
+    grow(tile, skipInternalDetection = false) {
+        // 1. 预检杠 (加杠或暗杠)
+        let isKong = false;
+        let kakanGroupId = null;
+        let ankanTiles = [];
+
+        if (!skipInternalDetection) {
+            // 加杠检测 (1个普通 + 3个铁牌)
+            const ironTiles = this.tiles.filter(t => t && t.isIron);
+            const groups = {};
+            ironTiles.forEach(t => {
+                if (t.groupId) {
+                    if (!groups[t.groupId]) groups[t.groupId] = [];
+                    groups[t.groupId].push(t);
+                }
+            });
+            for (const gid in groups) {
+                if (groups[gid].length === 3 && groups[gid][0].type === tile.type && groups[gid][0].value === tile.value) {
+                    kakanGroupId = gid;
+                    isKong = true;
+                    break;
+                }
+            }
+
+            // 暗杠检测 (4个普通)
+            const sameNormalTiles = this.tiles.filter(t => t && !t.isIron && t.type === tile.type && t.value === tile.value);
+            if (sameNormalTiles.length === 3) {
+                isAnkan = true;
+                ankanTiles = [...sameNormalTiles, tile];
+                isKong = true;
+            }
+        }
+
+        const currentCount = this.tiles.filter(t => t !== null).length;
+        // 如果不是杠且已经达到上限，且不是外部掠夺逻辑，则拒绝成长
+        if (!isKong && !skipInternalDetection && currentCount >= this.getMaxTiles()) return null;
         
         let replaced = false;
         const firstNormalIdx = this.tiles.findIndex((t, i) => i > 0 && (!t || !t.isIron));
@@ -185,17 +225,24 @@ export class Snake {
 
         let result = { type: 'grow', tile };
 
-        // 开发阶段 8：检测暗杠 (Concealed Kong)
-        const sameTiles = this.tiles.filter(t => 
-            t && !t.isIron && t.type === tile.type && t.value === tile.value
-        );
-        
-        if (sameTiles.length === 4) {
-            this.hardenTiles(sameTiles, true);
-            result.type = 'kong';
-            result.effectText = '暗杠！';
+        if (!skipInternalDetection) {
+            if (kakanGroupId) {
+                tile.isIron = true;
+                tile.groupId = kakanGroupId;
+                this.maxTilesBonus += 1;
+                result.type = 'kong';
+                result.isConcealed = false;
+                result.effectText = '加杠！';
+                this.playVoice('fulu');
+            } else if (isAnkan) {
+                this.hardenTiles(ankanTiles, true);
+                result.type = 'kong';
+                result.isConcealed = true;
+                result.effectText = '暗杠！';
+            }
         }
 
+        this.checkWin();
         this.needsSort = true;
         return result;
     }

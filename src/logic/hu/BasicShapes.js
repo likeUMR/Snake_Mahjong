@@ -9,13 +9,40 @@ import { CONFIG } from '../../core/config.js';
  * Note: Dynamic hand size (3n+2)
  */
 export function checkStandard(tiles) {
-    if (tiles.length % 3 !== 2) return false;
+    // 计算杠的数量（每组4张的铁牌视为1个杠）
+    const groups = {};
+    tiles.forEach(t => {
+        if (t.isIron && t.groupId) {
+            if (!groups[t.groupId]) groups[t.groupId] = [];
+            groups[t.groupId].push(t);
+        }
+    });
+    
+    let kongCount = 0;
+    const kongWeights = [];
+    for (const gid in groups) {
+        if (groups[gid].length === 4) {
+            kongCount++;
+            // 记录该杠牌的权重，后续计数时需要减去1张
+            kongWeights.push(groups[gid][0].getSortWeight());
+        }
+    }
+
+    // 基础胡牌结构：每多一个杠，总牌数增加1，但有效牌数（计算3n+2时）保持不变
+    if ((tiles.length - kongCount) % 3 !== 2) return false;
 
     const counts = new Map();
     for (const tile of tiles) {
         const key = tile.getSortWeight();
         counts.set(key, (counts.get(key) || 0) + 1);
     }
+
+    // 核心修正：在进行拆解前，将每个杠的4张牌视为3张
+    kongWeights.forEach(w => {
+        if (counts.has(w) && counts.get(w) >= 4) {
+            counts.set(w, counts.get(w) - 1);
+        }
+    });
 
     const uniqueKeys = Array.from(counts.keys());
     for (const key of uniqueKeys) {
@@ -120,12 +147,5 @@ export function checkThirteenOrphans(tiles) {
     // Must have all 13 types
     return terminalWeights.every(w => counts.has(w));
 }
-
-
-
-
-
-
-
 
 

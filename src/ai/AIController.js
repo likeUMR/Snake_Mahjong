@@ -32,7 +32,7 @@ export class AIController {
             const discardIndex = recommendDiscardTile(this.snake.tiles);
             if (discardIndex !== -1) {
                 const discardedTile = this.snake.tiles.filter(t => t !== null)[discardIndex];
-                if (discardedTile) {
+                if (discardedTile && CONFIG.DEBUG_MODE) {
                     console.log(`[AI Debug] ${this.label.text} 满牌，自动弃牌: ${discardedTile.value}${discardedTile.type}`);
                 }
                 this.snake.discardTile(discardIndex);
@@ -56,12 +56,21 @@ export class AIController {
 
         // 2. 转向逻辑
         if (this.state === AI_STATE.WANDER) {
-            // 游走状态：继承计时器，到点才换向
-            this.aiTurnTimer += deltaTime;
-            if (this.aiTurnTimer >= this.aiTurnInterval) {
+            // 检查当前方向是否会导致碰撞（如撞墙）
+            const head = this.snake.body[0];
+            const nextH = { 
+                x: head.x + this.snake.nextDirection.x, 
+                y: head.y + this.snake.nextDirection.y 
+            };
+            const willCollide = checkPotentialCollision(this.snake, nextH, this.allSnakes);
+
+            // 如果即将碰撞，或者到了随机转向的时间
+            if (willCollide || this.aiTurnTimer >= this.aiTurnInterval) {
                 this.aiTurnTimer = 0;
                 this.aiTurnInterval = this.getRandomAIInterval();
                 this.executeMovement();
+            } else {
+                this.aiTurnTimer += deltaTime;
             }
         } else {
             // 非游走状态（觅食、追逐、逃跑）：
@@ -107,7 +116,7 @@ export class AIController {
                 }
                 break;
         }
-        if (oldState !== this.state) {
+        if (oldState !== this.state && CONFIG.DEBUG_MODE) {
             console.log(`[AI Debug] ${this.label.text}: ${oldState} -> ${this.state}`);
         }
     }
@@ -149,7 +158,7 @@ export class AIController {
             this.state = AI_STATE.CHASE;
             this.target = closestChase;
             this.stateTimer = 0;
-            console.log(`[AI Debug] ${this.label.text} 锁定追逐目标: ${closestChase.snake.color} 第 ${closestChase.index} 节牌`);
+            if (CONFIG.DEBUG_MODE) console.log(`[AI Debug] ${this.label.text} 锁定追逐目标: ${closestChase.snake.color} 第 ${closestChase.index} 节牌`);
             return;
         }
 
@@ -188,7 +197,7 @@ export class AIController {
             this.state = AI_STATE.ESCAPE;
             this.target = closestEscape;
             this.stateTimer = 0;
-            console.log(`[AI Debug] ${this.label.text} 发现威胁，逃离: ${closestEscape.snake.color}`);
+            if (CONFIG.DEBUG_MODE) console.log(`[AI Debug] ${this.label.text} 发现威胁，逃离: ${closestEscape.snake.color}`);
             return;
         }
 
@@ -208,7 +217,7 @@ export class AIController {
             this.state = AI_STATE.FORAGE;
             this.target = closestFood;
             this.stateTimer = 0;
-            console.log(`[AI Debug] ${this.label.text} 前往觅食: ${closestFood.tile.value}${closestFood.tile.type}`);
+            if (CONFIG.DEBUG_MODE) console.log(`[AI Debug] ${this.label.text} 前往觅食: ${closestFood.tile.value}${closestFood.tile.type}`);
             return;
         }
 
@@ -354,18 +363,19 @@ export class AIController {
             ctx.fillText(this.label.text, centerX, labelY);
 
             // 2. 调试显示状态 (完全重叠在蛇头中心数字位置)
-            const stateNames = {
-                'wander': '游走',
-                'forage': '觅食',
-                'chase': '追逐',
-                'escape': '逃跑'
-            };
-            ctx.fillStyle = '#f1c40f'; // 使用黄色确保在白色数字之上可见
-            ctx.font = 'bold 12px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            // ctx.fillText(stateNames[this.state] || this.state, centerX, centerY);
-            ctx.fillText("DEBUG:" + (stateNames[this.state] || this.state || "NULL"), centerX, centerY);
+            if (CONFIG.DEBUG_MODE) {
+                const stateNames = {
+                    'wander': '游走',
+                    'forage': '觅食',
+                    'chase': '追逐',
+                    'escape': '逃跑'
+                };
+                ctx.fillStyle = '#f1c40f'; // 使用黄色确保在白色数字之上可见
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText("DEBUG:" + (stateNames[this.state] || this.state || "NULL"), centerX, centerY);
+            }
         }
     }
 }

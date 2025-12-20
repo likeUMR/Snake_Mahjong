@@ -96,11 +96,3 @@ export function checkYaku(tiles) {
     return yakuList;
 }
 
-
-
-
-
-
-
-
-

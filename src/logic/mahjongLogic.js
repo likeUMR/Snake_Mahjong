@@ -1,4 +1,5 @@
 import { CONFIG } from '../core/config.js';
+import { evaluateHu } from './hu/HuManager.js';
 
 /**
  * Sorting logic for Mahjong tiles.
@@ -9,38 +10,31 @@ export function sortTiles(tiles) {
 
 /**
  * Checks if a set of tiles constitutes a winning hand (Hu).
- * Standard Hu: 3n + 2 tiles, forming n sets (pung or chow) and 1 pair.
+ * Uses the advanced evaluateHu for detailed results.
  */
 export function canHu(tiles, maxTiles = CONFIG.MAX_SNAKE_TILES) {
     const validTiles = tiles.filter(t => t !== null);
-    // 必须达到满手牌（动态上限）且符合 3n+2 结构才能胡牌
-    if (validTiles.length !== maxTiles || validTiles.length % 3 !== 2) {
-        return false;
-    }
-
-    // Convert tiles to a map for easier counting
-    const counts = new Map();
-    for (const tile of validTiles) {
-        const key = tile.getSortWeight();
-        counts.set(key, (counts.get(key) || 0) + 1);
-    }
-
-    // Try each possible pair
-    const uniqueKeys = Array.from(counts.keys());
-    for (const key of uniqueKeys) {
-        if (counts.get(key) >= 2) {
-            // Potential pair found
-            const remainingCounts = new Map(counts);
-            remainingCounts.set(key, remainingCounts.get(key) - 2);
-            if (remainingCounts.get(key) === 0) remainingCounts.delete(key);
-
-            if (canDecompose(remainingCounts)) {
-                return true;
-            }
+    
+    // 计算杠的数量以判定有效长度
+    const groups = {};
+    validTiles.forEach(t => {
+        if (t.isIron && t.groupId) {
+            if (!groups[t.groupId]) groups[t.groupId] = [];
+            groups[t.groupId].push(t);
         }
+    });
+    let kongCount = 0;
+    for (const gid in groups) {
+        if (groups[gid].length === 4) kongCount++;
     }
 
-    return false;
+    // 必须达到满手牌（动态上限）且符合 3n+2 结构才能胡牌
+    // 每有一个杠，物理牌数增加1，但有效牌数（3n+2）计算时需要减去杠数
+    if (validTiles.length !== maxTiles || (validTiles.length - kongCount) % 3 !== 2) {
+        return null;
+    }
+
+    return evaluateHu(validTiles);
 }
 
 /**
@@ -101,12 +95,20 @@ export function canChow(tiles, targetTile) {
 }
 
 /**
- * 统一掠夺判定入口 (杠 > 碰 > 吃)
+ * 统一掠夺判定入口 (胡 > 杠 > 碰 > 吃)
  * 用于预指示高亮和实际碰撞判定，确保逻辑完全一致
  * 开发阶段 10 新规：当长度达到上限后，不能吃碰，只能杠
  */
-export function getRobberyAction(attackerTiles, targetTile, isShangJia, isAttackerFull = false) {
+export function getRobberyAction(attackerTiles, targetTile, isShangJia, isAttackerFull = false, attackerMaxTiles = CONFIG.MAX_SNAKE_TILES) {
     if (!targetTile || targetTile.isIron) return null;
+
+    // 0. 判定胡 (最高优先级)
+    // 只有当拿走这张牌能让自己胡牌时，才判定为胡
+    const potentialTiles = [...attackerTiles, targetTile];
+    const huResult = canHu(potentialTiles, attackerMaxTiles);
+    if (huResult) {
+        return { type: 'hu', involvedTiles: [], effectText: '胡！', isKong: false, winResult: huResult };
+    }
 
     // 1. 判定杠 (任何时候都可以杠)
     let involvedTiles = canKong(attackerTiles, targetTile);
@@ -188,15 +190,23 @@ export function recommendDiscardTile(tiles) {
 }
 
 /**
- * 扫描对方全手牌，找出优先级最高的掠夺动作 (杠 > 碰 > 吃)
+ * 扫描对方全手牌，找出优先级最高的掠夺动作 (胡 > 杠 > 碰 > 吃)
  * 严格符合阶段 6 的逻辑：A 撞了 B，检查 A 是否能使用 B 身体中的“任何一张”牌
  */
-export function findBestRobberyFromHand(attackerTiles, targetTiles, isShangJia, isAttackerFull = false) {
-    // 1. 扫描是否有可以“杠”的牌 (优先级最高)
+export function findBestRobberyFromHand(attackerTiles, targetTiles, isShangJia, isAttackerFull = false, attackerMaxTiles = CONFIG.MAX_SNAKE_TILES) {
+    // 0. 扫描是否有可以“胡”的牌 (优先级最高)
     for (let i = 0; i < targetTiles.length; i++) {
         const tile = targetTiles[i];
         if (!tile || tile.isIron) continue;
-        const action = getRobberyAction(attackerTiles, tile, isShangJia, isAttackerFull);
+        const action = getRobberyAction(attackerTiles, tile, isShangJia, isAttackerFull, attackerMaxTiles);
+        if (action && action.type === 'hu') return { ...action, tileIndex: i };
+    }
+
+    // 1. 扫描是否有可以“杠”的牌
+    for (let i = 0; i < targetTiles.length; i++) {
+        const tile = targetTiles[i];
+        if (!tile || tile.isIron) continue;
+        const action = getRobberyAction(attackerTiles, tile, isShangJia, isAttackerFull, attackerMaxTiles);
         if (action && action.type === 'kong') return { ...action, tileIndex: i };
     }
 
@@ -207,7 +217,7 @@ export function findBestRobberyFromHand(attackerTiles, targetTiles, isShangJia, 
     for (let i = 0; i < targetTiles.length; i++) {
         const tile = targetTiles[i];
         if (!tile || tile.isIron) continue;
-        const action = getRobberyAction(attackerTiles, tile, isShangJia, isAttackerFull);
+        const action = getRobberyAction(attackerTiles, tile, isShangJia, isAttackerFull, attackerMaxTiles);
         if (action && action.type === 'pung') return { ...action, tileIndex: i };
     }
 
@@ -216,7 +226,7 @@ export function findBestRobberyFromHand(attackerTiles, targetTiles, isShangJia, 
         for (let i = 0; i < targetTiles.length; i++) {
             const tile = targetTiles[i];
             if (!tile || tile.isIron) continue;
-            const action = getRobberyAction(attackerTiles, tile, isShangJia, isAttackerFull);
+            const action = getRobberyAction(attackerTiles, tile, isShangJia, isAttackerFull, attackerMaxTiles);
             if (action && action.type === 'chow') return { ...action, tileIndex: i };
         }
     }
