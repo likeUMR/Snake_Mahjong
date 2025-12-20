@@ -2,7 +2,7 @@ import { CONFIG } from './config.js';
 import { Snake } from '../entities/snake.js';
 import { Food } from '../entities/food.js';
 import { DiscardUI, TutorialUI } from '../ui/ui.js';
-import { getSafeRandomPosition } from './utils.js';
+import { getSafeRandomPosition, assetManager } from './utils.js';
 import { checkPotentialCollision } from '../logic/collisionLogic.js';
 import { AIController } from '../ai/AIController.js';
 import { canHu, getRobberyAction, findBestRobberyFromHand } from '../logic/mahjongLogic.js';
@@ -40,29 +40,43 @@ class Game {
         this.scale = 1;
         this.isGameOver = false;
         this.winner = null;
+        this.isAssetsLoaded = false; // 新载标志
         this.discardUI = new DiscardUI();
         this.tutorialUI = new TutorialUI();
         
         this.lastTime = 0;
 
-        // 初始化音频系统
-        audioManager.initBgm(['game_master.mp3', 'game.mp3']);
-        audioManager.setListener(this.snake); // 设置玩家为监听者
-        
         window.addEventListener('keydown', (e) => {
+            if (!this.isAssetsLoaded) return;
             audioManager.resumeAudio();
             this.snake.handleInput(e.key);
         });
         window.addEventListener('resize', () => this.resize());
         this.canvas.addEventListener('mousedown', (e) => {
+            if (!this.isAssetsLoaded) return;
             audioManager.resumeAudio();
             if (this.isGameOver) return;
             this.discardUI.handleMouseDown(e, this.canvas, (index) => {
                 this.snake.discardTile(index);
             });
         });
-        
+
         this.resize();
+        this.init();
+    }
+
+    async init() {
+        // 1. 初始化 BGM 清单
+        audioManager.initBgm(['game_master.mp3', 'game.mp3']);
+        audioManager.setListener(this.snake); 
+
+        // 2. 并行加载资源
+        await Promise.all([
+            assetManager.preloadAll(),
+            audioManager.preloadEssential()
+        ]);
+
+        this.isAssetsLoaded = true;
         this.spawnFood();
         
         const head = this.snake.body[0];
@@ -333,6 +347,11 @@ class Game {
         const logicalWidth = this.canvas.width / dpr;
         const logicalHeight = this.canvas.height / dpr;
 
+        if (!this.isAssetsLoaded) {
+            this.drawLoading(logicalWidth, logicalHeight);
+            return;
+        }
+
         this.ctx.clearRect(0, 0, logicalWidth, logicalHeight);
         this.ctx.save();
         this.ctx.translate(logicalWidth / 2, logicalHeight / 2);
@@ -512,6 +531,23 @@ class Game {
             const text = `${nameText.padEnd(15)} 分数: ${snake.score}`;
             this.ctx.fillText(text, logicalWidth / 2, startY + index * entryHeight);
         });
+    }
+
+    drawLoading(width, height) {
+        this.ctx.clearRect(0, 0, width, height);
+        this.ctx.fillStyle = '#2c3e50';
+        this.ctx.fillRect(0, 0, width, height);
+        
+        this.ctx.fillStyle = '#fff';
+        this.ctx.font = 'bold 30px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('资源加载中 (Loading Assets...)', width / 2, height / 2);
+        
+        this.ctx.font = '20px Arial';
+        this.ctx.fillText('首次加载可能较慢，请稍候', width / 2, height / 2 + 50);
+
+        // 依然循环调用请求动画帧，以便能显示加载画面
+        requestAnimationFrame(() => this.draw());
     }
 
     drawGrid() {

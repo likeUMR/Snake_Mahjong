@@ -9,6 +9,48 @@ export class AssetManager {
     constructor() {
         this.images = new Map();
         this.basePath = 'SVG_Background/';
+        // 定义所有麻将牌清单，确保一次性加载
+        this.tileList = [];
+        this.initTileList();
+    }
+
+    initTileList() {
+        // 万 (1-9m)
+        for (let i = 1; i <= 9; i++) this.tileList.push(`${i}m`);
+        // 条 (1-9s)
+        for (let i = 1; i <= 9; i++) this.tileList.push(`${i}s`);
+        // 饼 (1-9p)
+        for (let i = 1; i <= 9; i++) this.tileList.push(`${i}p`);
+        // 风/字 (1-7z)，其中 5z.svg (白板) 不存在
+        for (let i = 1; i <= 7; i++) {
+            if (i === 5) continue;
+            this.tileList.push(`${i}z`);
+        }
+        // 特殊 0m, 0p, 0s (赤宝牌)
+        this.tileList.push('0m', '0p', '0s');
+        // 其他可能存在的 (根据目录截图：chun, dong, ju, lan, mei, qiu, xia, zu)
+        this.tileList.push('chun', 'dong', 'ju', 'lan', 'mei', 'qiu', 'xia', 'zu');
+    }
+
+    async preloadAll() {
+        const promises = this.tileList.map(name => {
+            return new Promise((resolve) => {
+                const path = `${this.basePath}${name}.svg`;
+                if (this.images.has(path)) {
+                    resolve();
+                    return;
+                }
+                const img = new Image();
+                img.onload = () => resolve();
+                img.onerror = () => {
+                    console.warn(`Failed to load asset: ${path}`);
+                    resolve(); // 失败也 resolve，避免阻塞游戏
+                };
+                img.src = path;
+                this.images.set(path, img);
+            });
+        });
+        await Promise.all(promises);
     }
 
     getTileImageName(tile) {

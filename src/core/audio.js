@@ -96,6 +96,44 @@ class AudioManager {
         }
     }
 
+    /**
+     * 预加载核心音效，减少游戏过程中的网络请求延迟
+     */
+    async preloadEssential() {
+        const essentialFiles = [
+            'eat_food.mp3',
+            'fulu.mp3',
+            'xuanyun.mp3',
+            'ron_music.mp3',
+            'ron_ko.mp3'
+        ];
+        
+        // 每个角色最常用的语音
+        CONFIG.AUDIO_CHARACTERS.forEach(char => {
+            ['act_chi', 'act_pon', 'act_kan', 'act_ron', 'act_tumo', 'game_top'].forEach(act => {
+                essentialFiles.push(`${char}/${act}.mp3`);
+            });
+        });
+
+        const promises = essentialFiles.map(file => {
+            return new Promise(resolve => {
+                const path = CONFIG.AUDIO_BASE_PATH + file;
+                const audio = new Audio();
+                audio.addEventListener('canplaythrough', () => resolve(), { once: true });
+                audio.addEventListener('error', () => {
+                    console.warn(`Failed to preload audio: ${path}`);
+                    resolve();
+                }, { once: true });
+                audio.src = path;
+                audio.load(); // 触发加载
+            });
+        });
+
+        // 设定一个超时，防止音效加载太久阻塞游戏
+        const timeout = new Promise(resolve => setTimeout(resolve, 5000));
+        await Promise.race([Promise.all(promises), timeout]);
+    }
+
     async resumeAudio() {
         if (this.isInitialized) return;
         if (this.bgmPlayer && this.bgmPlayer.paused) {

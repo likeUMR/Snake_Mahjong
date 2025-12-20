@@ -167,8 +167,8 @@ export class Snake {
         // 1. 预检杠 (加杠或暗杠)
         let isKong = false;
         let kakanGroupId = null;
-        let isAnkan = false;
-        let ankanTiles = [];
+        let internalIsAnkan = false; // 重命名以防潜在冲突
+        let internalAnkanTiles = [];
 
         if (!skipInternalDetection) {
             // 加杠检测 (1个普通 + 3个铁牌)
@@ -191,8 +191,8 @@ export class Snake {
             // 暗杠检测 (4个普通)
             const sameNormalTiles = this.tiles.filter(t => t && !t.isIron && t.type === tile.type && t.value === tile.value);
             if (sameNormalTiles.length === 3) {
-                isAnkan = true;
-                ankanTiles = [...sameNormalTiles, tile];
+                internalIsAnkan = true;
+                internalAnkanTiles = [...sameNormalTiles, tile];
                 isKong = true;
             }
         }
@@ -235,8 +235,8 @@ export class Snake {
                 result.isConcealed = false;
                 result.effectText = '加杠！';
                 this.playVoice('fulu');
-            } else if (isAnkan) {
-                this.hardenTiles(ankanTiles, true);
+            } else if (internalIsAnkan) {
+                this.hardenTiles(internalAnkanTiles, true);
                 result.type = 'kong';
                 result.isConcealed = true;
                 result.effectText = '暗杠！';
