@@ -4,6 +4,50 @@ import { CONFIG } from './config.js';
  * Utility functions for the game.
  */
 
+// Asset Manager to handle image loading and caching
+export class AssetManager {
+    constructor() {
+        this.images = new Map();
+        this.basePath = 'SVG_Background/';
+    }
+
+    getTileImageName(tile) {
+        if (!tile) return null;
+        
+        let suffix = '';
+        if (tile.type === CONFIG.MAHJONG_TYPES.WAN) suffix = 'm';
+        else if (tile.type === CONFIG.MAHJONG_TYPES.TIAO) suffix = 's';
+        else if (tile.type === CONFIG.MAHJONG_TYPES.BING) suffix = 'p';
+        else if (tile.type === CONFIG.MAHJONG_TYPES.FENG || tile.type === CONFIG.MAHJONG_TYPES.YUAN) {
+            suffix = 'z';
+            const specialMapping = {
+                '东': '1', '南': '2', '西': '3', '北': '4',
+                '白': '5', '发': '6', '中': '7'
+            };
+            return (specialMapping[tile.value] || '') + suffix;
+        }
+
+        return tile.value + suffix;
+    }
+
+    getTileImage(tile) {
+        const name = this.getTileImageName(tile);
+        if (!name) return null;
+        
+        const path = `${this.basePath}${name}.svg`;
+        if (this.images.has(path)) {
+            return this.images.get(path);
+        }
+
+        const img = new Image();
+        img.src = path;
+        this.images.set(path, img);
+        return img;
+    }
+}
+
+export const assetManager = new AssetManager();
+
 /**
  * Generates a random position on the grid.
  */

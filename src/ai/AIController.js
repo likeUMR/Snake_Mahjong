@@ -1,5 +1,5 @@
 import { CONFIG } from '../core/config.js';
-import { canKong, canPung, canChow } from '../logic/mahjongLogic.js';
+import { canKong, canPung, canChow, recommendDiscardTile, getRobberyAction } from '../logic/mahjongLogic.js';
 
 export const AI_STATE = {
     WANDER: 'wander',
@@ -24,8 +24,26 @@ export class AIController {
         return CONFIG.AI_MOVE_INTERVAL_MIN + Math.random() * (CONFIG.AI_MOVE_INTERVAL_MAX - CONFIG.AI_MOVE_INTERVAL_MIN);
     }
 
+    checkAutoDiscard() {
+        const mahjongCount = this.snake.tiles.filter(t => t !== null).length;
+        // 当达到满牌上限时，自动弃掉一张最优牌
+        if (mahjongCount >= this.snake.getMaxTiles()) {
+            const discardIndex = recommendDiscardTile(this.snake.tiles);
+            if (discardIndex !== -1) {
+                const discardedTile = this.snake.tiles.filter(t => t !== null)[discardIndex];
+                if (discardedTile) {
+                    console.log(`[AI Debug] ${this.label.text} 满牌，自动弃牌: ${discardedTile.value}${discardedTile.type}`);
+                }
+                this.snake.discardTile(discardIndex);
+            }
+        }
+    }
+
     update(deltaTime, allSnakes, allFoods, game) {
         if (this.snake.isStunned) return;
+
+        // 开发阶段 10：AI 弃牌逻辑
+        this.checkAutoDiscard();
 
         this.stateTimer += deltaTime;
 
@@ -115,10 +133,10 @@ export class AIController {
                     if (!tile || tile.isIron) continue;
 
                     // 判定自己是否能吃碰杠对方的这张牌
-                    let canRob = !!(canKong(this.snake.tiles, tile) || canPung(this.snake.tiles, tile));
-                    if (!canRob && game.checkIsShangJia(this.snake, other)) {
-                        canRob = !!canChow(this.snake.tiles, tile);
-                    }
+                    const isAttackerFull = this.snake.tiles.filter(t => t !== null).length >= this.snake.getMaxTiles();
+                    const isShangJia = game.checkIsShangJia(this.snake, other);
+                    const action = getRobberyAction(this.snake.tiles, tile, isShangJia, isAttackerFull);
+                    let canRob = !!action;
 
                     if (canRob && dist < minChaseDist) {
                         minChaseDist = dist;
@@ -151,10 +169,10 @@ export class AIController {
 
                 const distToOtherHead = this.getDist(other.body[0], myPart);
                 if (distToOtherHead <= CONFIG.AI_FOV_RADIUS) {
-                    let canBeRobbed = !!(canKong(other.tiles, myTile) || canPung(other.tiles, myTile));
-                    if (!canBeRobbed && game.checkIsShangJia(other, this.snake)) {
-                        canBeRobbed = !!canChow(other.tiles, myTile);
-                    }
+                    const isOtherFull = other.tiles.filter(t => t !== null).length >= other.getMaxTiles();
+                    const isOtherShangJia = game.checkIsShangJia(other, this.snake);
+                    const action = getRobberyAction(other.tiles, myTile, isOtherShangJia, isOtherFull);
+                    let canBeRobbed = !!action;
 
                     if (canBeRobbed) {
                         const distToMe = this.getDist(head, other.body[0]);

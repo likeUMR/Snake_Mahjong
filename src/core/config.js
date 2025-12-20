@@ -34,6 +34,24 @@ export const CONFIG = {
     COLOR_PUNG: '#f1c40f',      // 碰 - 黄色
     COLOR_KONG: '#e67e22',      // 杠 - 橙色
 
+    EFFECT_TEXT_SIZE: 80,       // 吃碰杠特效文字大小 (px)
+
+    // Leaderboard settings
+    LEADERBOARD_WIDTH: 300,
+    LEADERBOARD_PADDING: 20,
+    LEADERBOARD_ENTRY_HEIGHT: 35,
+    LEADERBOARD_TITLE_HEIGHT: 50,
+    LEADERBOARD_TITLE_FONT_SIZE: 24,
+    LEADERBOARD_ENTRY_FONT_SIZE: 18,
+
+    // Score settings
+    SCORE_FOOD: 10,
+    SCORE_CHOW: 50,
+    SCORE_PUNG: 100,
+    SCORE_KONG: 200,
+    SCORE_CONCEALED_KONG: 300,
+    SCORE_HU: 500,
+
     STUN_DURATION: 3000, // ms
     GHOST_DURATION: 3000, // ms (for Phase 6, but good to have now)
     LABEL_FLOAT_HEIGHT: 0.1, // 以格子高度为单位，向上浮动的高度

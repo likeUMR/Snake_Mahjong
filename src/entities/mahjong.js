@@ -12,6 +12,13 @@ export class MahjongTile {
         return `${this.value}${this.type}`;
     }
 
+    clone() {
+        const copy = new MahjongTile(this.type, this.value);
+        copy.isIron = this.isIron;
+        copy.groupId = this.groupId;
+        return copy;
+    }
+
     getSortWeight() {
         const typeOrder = [
             CONFIG.MAHJONG_TYPES.WAN,
@@ -64,5 +71,5 @@ for (const yuan of yuans) {
 
 export function getRandomTile() {
     const index = Math.floor(Math.random() * ALL_TILES.length);
-    return ALL_TILES[index];
+    return ALL_TILES[index].clone();
 }

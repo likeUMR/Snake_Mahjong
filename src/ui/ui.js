@@ -1,4 +1,5 @@
 import { CONFIG } from '../core/config.js';
+import { assetManager } from '../core/utils.js';
 
 export class DiscardUI {
     constructor() {
@@ -38,8 +39,11 @@ export class DiscardUI {
         totalWidth += normalTiles.length * (tileUIWidth + spacing);
         if (totalWidth > 0) totalWidth -= spacing;
 
-        const startX = (canvas.width - totalWidth) / 2;
-        const startY = canvas.height - tileUIHeight - 30;
+        const screenWidth = canvas.width / (window.devicePixelRatio || 1);
+        const screenHeight = canvas.height / (window.devicePixelRatio || 1);
+
+        const startX = (screenWidth - totalWidth) / 2;
+        const startY = screenHeight - tileUIHeight - 30;
 
         // Draw background panel
         ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
@@ -89,18 +93,29 @@ export class DiscardUI {
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // Draw label
-        ctx.fillStyle = '#000';
-        ctx.font = '16px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        let label = tile.value;
-        if (tile.type === CONFIG.MAHJONG_TYPES.WAN) label += '万';
-        else if (tile.type === CONFIG.MAHJONG_TYPES.TIAO) label += '条';
-        else if (tile.type === CONFIG.MAHJONG_TYPES.BING) label += '饼';
-        
-        ctx.fillText(label, x + width / 2, y + height / 2);
+        // 绘制 SVG 背景图 (开发阶段 10 优化)
+        const img = assetManager.getTileImage(tile);
+        if (img && img.complete && img.naturalWidth !== 0) {
+            const padding = 10;
+            ctx.drawImage(img, x + padding, y + padding, width - padding * 2, height - padding * 2);
+        } else if (tile.value === '白' && tile.type === CONFIG.MAHJONG_TYPES.YUAN) {
+            // 白板保持空白
+        } else {
+            // 降级方案显示文字
+            /*
+            ctx.fillStyle = '#000';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            let label = tile.value;
+            if (tile.type === CONFIG.MAHJONG_TYPES.WAN) label += '万';
+            else if (tile.type === CONFIG.MAHJONG_TYPES.TIAO) label += '条';
+            else if (tile.type === CONFIG.MAHJONG_TYPES.BING) label += '饼';
+            
+            ctx.fillText(label, x + width / 2, y + height / 2);
+            */
+        }
     }
 
     handleMouseDown(e, canvas, onDiscard) {

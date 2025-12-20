@@ -1,5 +1,6 @@
 import { CONFIG } from '../core/config.js';
 import { sortTiles, canHu } from '../logic/mahjongLogic.js';
+import { assetManager } from '../core/utils.js';
 
 export class Snake {
     constructor(x, y, color = '#2c3e50') {
@@ -26,6 +27,8 @@ export class Snake {
 
         this.maxTilesBonus = 0; 
         this.ironGroupCount = 0; 
+        this.pendingShrink = 0; // 开发阶段 10：待缩短的长度
+        this.score = 0; // 开发阶段 11：玩家分数
         
         // 渲染辅助：记录本帧哪些牌需要高亮边框 { index: color }
         this.highlights = {};
@@ -51,7 +54,8 @@ export class Snake {
         const lostTile = this.tiles[index];
         if (lostTile && lostTile.isIron) return null;
         this.tiles.splice(index, 1);
-        if (index < this.body.length) this.body.splice(index, 1);
+        // 不再立即 splice body，而是增加待缩短计数，让尾部在移动时“追赶”
+        this.pendingShrink++;
         this.needsSort = true;
         return lostTile;
     }
@@ -114,7 +118,17 @@ export class Snake {
             this.needsSort = false;
         }
         this.body.unshift(nextHead);
+        
+        // 标准移动：去掉末尾
         this.body.pop();
+
+        // 开发阶段 10：如果存在待缩短长度（如刚丢弃或失去牌），则再去掉一个末尾
+        // 这实现了“后面的牌移动两次”的效果，快速补齐空位
+        if (this.pendingShrink > 0 && this.body.length > 1) {
+            this.body.pop();
+            this.pendingShrink--;
+        }
+
         if (canHu(this.tiles, this.getMaxTiles())) this.isWin = true;
     }
 
@@ -139,10 +153,12 @@ export class Snake {
     }
 
     grow(tile) {
-        if (this.tiles.filter(t => t !== null).length >= this.getMaxTiles()) return;
+        if (this.tiles.filter(t => t !== null).length >= this.getMaxTiles()) return null;
+        
         let replaced = false;
         const firstNormalIdx = this.tiles.findIndex((t, i) => i > 0 && (!t || !t.isIron));
         const startSearch = firstNormalIdx === -1 ? 1 : firstNormalIdx;
+        
         for (let i = startSearch; i < this.tiles.length; i++) {
             if (this.tiles[i] === null) {
                 this.tiles[i] = tile;
@@ -150,12 +166,33 @@ export class Snake {
                 break;
             }
         }
+
         if (!replaced) {
             this.tiles.push(tile);
-            const lastPart = this.body[this.body.length - 1];
-            this.body.push({ x: lastPart.x, y: lastPart.y });
+            // 如果有待缩短的长度，说明 body 里有多余的格子，直接抵消即可
+            if (this.pendingShrink > 0) {
+                this.pendingShrink--;
+            } else {
+                const lastPart = this.body[this.body.length - 1];
+                this.body.push({ x: lastPart.x, y: lastPart.y });
+            }
         }
+
+        let result = { type: 'grow', tile };
+
+        // 开发阶段 8：检测暗杠 (Concealed Kong)
+        const sameTiles = this.tiles.filter(t => 
+            t && !t.isIron && t.type === tile.type && t.value === tile.value
+        );
+        
+        if (sameTiles.length === 4) {
+            this.hardenTiles(sameTiles, true);
+            result.type = 'kong';
+            result.effectText = '暗杠！';
+        }
+
         this.needsSort = true;
+        return result;
     }
 
     hardenTiles(newTiles, isKong = false) {
@@ -186,7 +223,7 @@ export class Snake {
         }
         if (actualIndex !== -1) {
             this.tiles.splice(actualIndex, 1);
-            if (actualIndex < this.body.length) this.body.splice(actualIndex, 1);
+            this.pendingShrink++;
             this.needsSort = true;
         }
     }
@@ -238,15 +275,29 @@ export class Snake {
             ctx.strokeRect(x + 1.5, y + 1.5, CONFIG.TILE_WIDTH - 3, CONFIG.TILE_HEIGHT - 3);
         }
 
-        ctx.fillStyle = '#000';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        let label = tile.value;
-        if (tile.type === CONFIG.MAHJONG_TYPES.WAN) label += '万';
-        else if (tile.type === CONFIG.MAHJONG_TYPES.TIAO) label += '条';
-        else if (tile.type === CONFIG.MAHJONG_TYPES.BING) label += '饼';
-        ctx.fillText(label, x + CONFIG.TILE_WIDTH / 2, y + CONFIG.TILE_HEIGHT / 2);
+        // 绘制 SVG 背景图 (开发阶段 10 优化)
+        const img = assetManager.getTileImage(tile);
+        if (img && img.complete && img.naturalWidth !== 0) {
+            // 保持一定的边距
+            const padding = 2;
+            ctx.drawImage(img, x + padding, y + padding, CONFIG.TILE_WIDTH - padding * 2, CONFIG.TILE_HEIGHT - padding * 2);
+        } else if (tile.value === '白' && tile.type === CONFIG.MAHJONG_TYPES.YUAN) {
+            // 白板保持空白，不显示文字
+        } else {
+            // 如果图片还没加载好，或者没有对应图片，作为降级方案显示文字（虽然按要求不应显示，但加载中展示一下有助于调试）
+            // 如果你确定完全不需要文字，可以留空
+            /*
+            ctx.fillStyle = '#000';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            let label = tile.value;
+            if (tile.type === CONFIG.MAHJONG_TYPES.WAN) label += '万';
+            else if (tile.type === CONFIG.MAHJONG_TYPES.TIAO) label += '条';
+            else if (tile.type === CONFIG.MAHJONG_TYPES.BING) label += '饼';
+            ctx.fillText(label, x + CONFIG.TILE_WIDTH / 2, y + CONFIG.TILE_HEIGHT / 2);
+            */
+        }
     }
 
     // 新增：专门用于绘制眩晕文字，由 Game 统一调用确保在最上层

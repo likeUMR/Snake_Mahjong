@@ -63,9 +63,16 @@ class Game {
     }
 
     resize() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-        this.scale = this.canvas.height / (CONFIG.CAMERA_VERTICAL_FOV * CONFIG.TILE_HEIGHT);
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = window.innerWidth * dpr;
+        this.canvas.height = window.innerHeight * dpr;
+        this.canvas.style.width = window.innerWidth + 'px';
+        this.canvas.style.height = window.innerHeight + 'px';
+        
+        this.ctx.resetTransform();
+        this.ctx.scale(dpr, dpr);
+        
+        this.scale = window.innerHeight / (CONFIG.CAMERA_VERTICAL_FOV * CONFIG.TILE_HEIGHT);
     }
 
     spawnFood() {
@@ -82,11 +89,12 @@ class Game {
         }
     }
 
-    spawnEffect(text, gridX, gridY) {
+    spawnEffect(text, gridX, gridY, color = '#f1c40f') {
         this.effects.push({
             text: text,
             x: gridX * CONFIG.TILE_WIDTH + CONFIG.TILE_WIDTH / 2,
             y: gridY * CONFIG.TILE_HEIGHT,
+            color: color,
             life: 1000 // 持续 1s
         });
     }
@@ -109,11 +117,12 @@ class Game {
             if (targetSnake === this.snake || targetSnake.isGhost) return;
 
             const isShangJia = this.checkIsShangJia(this.snake, targetSnake);
+            const isAttackerFull = this.snake.tiles.filter(t => t !== null).length >= this.snake.getMaxTiles();
             
             for (let i = 1; i < targetSnake.tiles.length; i++) {
                 const tile = targetSnake.tiles[i];
                 // 使用统一判定入口
-                const action = getRobberyAction(this.snake.tiles, tile, isShangJia);
+                const action = getRobberyAction(this.snake.tiles, tile, isShangJia, isAttackerFull);
                 
                 if (action) {
                     if (action.type === 'kong') targetSnake.highlights[i] = CONFIG.COLOR_KONG;
@@ -139,6 +148,10 @@ class Game {
             return e.life > 0;
         });
 
+        // 开发阶段 10 优化：先检测食物碰撞，确保在移动前完成 grow 和排序
+        this.checkFoodCollisions();
+        this.spawnFood();
+
         // 顺序处理移动
         let anySnakeMoved = false;
         this.snakes.forEach(snake => {
@@ -159,21 +172,36 @@ class Game {
                         } else {
                             const targetSnake = collision.target;
                             const isShangJia = this.checkIsShangJia(snake, targetSnake);
+                            const isAttackerFull = snake.tiles.filter(t => t !== null).length >= snake.getMaxTiles();
 
                             // 核心修改：不再只检查 collision.bodyIndex 对应的牌
                             // 而是扫描对方全手牌，寻找符合“杠 > 碰 > 吃”优先级的第一个动作
-                            const action = findBestRobberyFromHand(snake.tiles, targetSnake.tiles, isShangJia);
+                            const action = findBestRobberyFromHand(snake.tiles, targetSnake.tiles, isShangJia, isAttackerFull);
 
                             if (action) {
                                 // 掠夺成功逻辑：根据 action.tileIndex 移除对应的牌
-                                const robbedTile = targetSnake.loseTile(action.tileIndex);
+                                    const robbedTile = targetSnake.loseTile(action.tileIndex);
                                 if (robbedTile) {
                                     snake.grow(robbedTile);
                                     snake.hardenTiles([...action.involvedTiles, robbedTile], action.isKong);
                                     targetSnake.enterGhostMode();
                                     snake.executeMove(nextHead);
                                     anySnakeMoved = true;
-                                    this.spawnEffect(action.effectText, nextHead.x, nextHead.y);
+                                    
+                                    // 统一颜色映射
+                                    let effectColor = '#f1c40f';
+                                    if (action.type === 'kong') {
+                                        effectColor = CONFIG.COLOR_KONG;
+                                        snake.score += CONFIG.SCORE_KONG;
+                                    } else if (action.type === 'pung') {
+                                        effectColor = CONFIG.COLOR_PUNG;
+                                        snake.score += CONFIG.SCORE_PUNG;
+                                    } else if (action.type === 'chow') {
+                                        effectColor = CONFIG.COLOR_CHOW;
+                                        snake.score += CONFIG.SCORE_CHOW;
+                                    }
+                                    
+                                    this.spawnEffect(action.effectText, nextHead.x, nextHead.y, effectColor);
                                 } else {
                                     snake.stun();
                                     snake.forceTurn();
@@ -193,13 +221,12 @@ class Game {
                 if (snake.isWin) {
                     this.isGameOver = true;
                     this.winner = snake;
+                    snake.score += CONFIG.SCORE_HU;
                 }
             }
         });
         
         if (anySnakeMoved && !this.isGameOver) {
-            this.checkFoodCollisions();
-            this.spawnFood();
             this.updateHighlights(); // 牌库变化，更新提示
         }
         
@@ -212,7 +239,17 @@ class Game {
             const foodIndex = this.foods.findIndex(f => f.gridX === head.x && f.gridY === head.y);
             if (foodIndex !== -1) {
                 const food = this.foods[foodIndex];
-                snake.grow(food.tile);
+                const growResult = snake.grow(food.tile);
+                
+                if (growResult) {
+                    if (growResult.type === 'kong') {
+                        this.spawnEffect(growResult.effectText, head.x, head.y, CONFIG.COLOR_KONG);
+                        snake.score += CONFIG.SCORE_CONCEALED_KONG;
+                    } else {
+                        snake.score += CONFIG.SCORE_FOOD;
+                    }
+                }
+                
                 this.foods.splice(foodIndex, 1);
             }
         });
@@ -239,8 +276,8 @@ class Game {
         
         // 绘制特效文字
         this.effects.forEach(e => {
-            this.ctx.fillStyle = '#f1c40f';
-            this.ctx.font = 'bold 20px Arial';
+            this.ctx.fillStyle = e.color || '#f1c40f';
+            this.ctx.font = `bold ${CONFIG.EFFECT_TEXT_SIZE}px Arial`;
             this.ctx.textAlign = 'center';
             this.ctx.globalAlpha = e.life / 1000;
             this.ctx.fillText(e.text, e.x, e.y);
@@ -255,6 +292,8 @@ class Game {
         
         this.discardUI.draw(this.ctx, this.canvas, this.snake.tiles);
         
+        this.drawLeaderboard();
+        
         if (this.isGameOver) {
             if (this.winner === this.snake) this.drawVictory();
             else {
@@ -262,6 +301,55 @@ class Game {
                 this.drawDefeat(winnerController ? winnerController.label : null);
             }
         }
+    }
+
+    drawLeaderboard() {
+        const padding = CONFIG.LEADERBOARD_PADDING;
+        const width = CONFIG.LEADERBOARD_WIDTH;
+        const entryHeight = CONFIG.LEADERBOARD_ENTRY_HEIGHT;
+        const titleHeight = CONFIG.LEADERBOARD_TITLE_HEIGHT;
+        
+        // Sort snakes by score
+        const sortedSnakes = [...this.snakes].sort((a, b) => b.score - a.score);
+        
+        const height = titleHeight + sortedSnakes.length * entryHeight + padding;
+        const x = this.canvas.width / (window.devicePixelRatio || 1) - width - padding;
+        const y = padding;
+
+        // Background
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.beginPath();
+        this.ctx.roundRect(x, y, width, height, 10);
+        this.ctx.fill();
+
+        // Title
+        this.ctx.fillStyle = '#f1c40f';
+        this.ctx.font = `bold ${CONFIG.LEADERBOARD_TITLE_FONT_SIZE}px Arial`;
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'top';
+        this.ctx.fillText('排行榜 (Leaderboard)', x + 15, y + 15);
+
+        // Entries
+        this.ctx.font = `${CONFIG.LEADERBOARD_ENTRY_FONT_SIZE}px Arial`;
+        sortedSnakes.forEach((snake, index) => {
+            const entryY = y + titleHeight + index * entryHeight + 10;
+            
+            // Marker for current player
+            if (snake === this.snake) {
+                this.ctx.fillStyle = '#3498db';
+                this.ctx.fillText('> 你 (You)', x + 15, entryY);
+            } else {
+                const controller = this.aiControllers.find(c => c.snake === snake);
+                this.ctx.fillStyle = controller ? controller.label.color : '#fff';
+                const name = controller ? controller.label.text : 'AI';
+                this.ctx.fillText(`${index + 1}. ${name}`, x + 15, entryY);
+            }
+            
+            this.ctx.textAlign = 'right';
+            this.ctx.fillStyle = '#fff';
+            this.ctx.fillText(snake.score, x + width - 15, entryY);
+            this.ctx.textAlign = 'left';
+        });
     }
 
     drawVictory() {

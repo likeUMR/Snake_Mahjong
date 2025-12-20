@@ -103,15 +103,19 @@ export function canChow(tiles, targetTile) {
 /**
  * 统一掠夺判定入口 (杠 > 碰 > 吃)
  * 用于预指示高亮和实际碰撞判定，确保逻辑完全一致
+ * 开发阶段 10 新规：当长度达到上限后，不能吃碰，只能杠
  */
-export function getRobberyAction(attackerTiles, targetTile, isShangJia) {
+export function getRobberyAction(attackerTiles, targetTile, isShangJia, isAttackerFull = false) {
     if (!targetTile || targetTile.isIron) return null;
 
-    // 1. 判定杠
+    // 1. 判定杠 (任何时候都可以杠)
     let involvedTiles = canKong(attackerTiles, targetTile);
     if (involvedTiles) {
         return { type: 'kong', involvedTiles, effectText: '杠！', isKong: true };
     }
+
+    // 如果攻击者已满，不能进行后续的碰和吃判定
+    if (isAttackerFull) return null;
 
     // 2. 判定碰
     involvedTiles = canPung(attackerTiles, targetTile);
@@ -131,23 +135,79 @@ export function getRobberyAction(attackerTiles, targetTile, isShangJia) {
 }
 
 /**
+ * 计算弃置哪张牌最优 (开发阶段 10)
+ * 返回当前牌库(去除非铁牌后的)中建议弃置的牌的索引
+ */
+export function recommendDiscardTile(tiles) {
+    const validTiles = tiles.filter(t => t !== null && !t.isIron);
+    if (validTiles.length === 0) return -1;
+
+    const scores = validTiles.map((tile, index) => {
+        let score = 0;
+        const v = tile.value;
+        const type = tile.type;
+
+        // 1. 相同牌判定 (刻子/对子潜力)
+        const sameTiles = validTiles.filter(t => t.type === type && t.value === v);
+        const count = sameTiles.length;
+        if (count >= 3) score += 100;
+        else if (count === 2) score += 60;
+
+        // 2. 顺子潜力 (仅限序牌)
+        if (type === CONFIG.MAHJONG_TYPES.WAN || type === CONFIG.MAHJONG_TYPES.TIAO || type === CONFIG.MAHJONG_TYPES.BING) {
+            const sameTypeTiles = validTiles.filter(t => t.type === type);
+            const values = sameTypeTiles.map(t => t.value);
+
+            if (values.includes(v - 1)) score += 30;
+            if (values.includes(v + 1)) score += 30;
+            if (values.includes(v - 2)) score += 10;
+            if (values.includes(v + 2)) score += 10;
+
+            // 边张/幺九牌稍微减分 (1, 9 潜力较小)
+            if (v === 1 || v === 9) score -= 5;
+        } else {
+            // 字牌若无对子刻子，价值较低
+            if (count === 1) score -= 10;
+        }
+
+        return { index, score };
+    });
+
+    // 找到分值最低的牌 (可能有多张，取第一张)
+    scores.sort((a, b) => a.score - b.score);
+    const bestToDiscard = scores[0];
+
+    // 我们需要返回在原 tiles 数组（包含铁牌和 null）中的索引，或者在 UI 展示的非铁牌数组中的索引？
+    // 根据 Snake.discardTile(mahjongIndex) 的定义，它接收的是非 null 牌的索引。
+    // 但是 Snake.discardTile 内部会跳过铁牌。
+    
+    // 重新映射回“非 null 牌”的索引
+    const allNonNullTiles = tiles.filter(t => t !== null);
+    const targetTile = validTiles[bestToDiscard.index];
+    return allNonNullTiles.indexOf(targetTile);
+}
+
+/**
  * 扫描对方全手牌，找出优先级最高的掠夺动作 (杠 > 碰 > 吃)
  * 严格符合阶段 6 的逻辑：A 撞了 B，检查 A 是否能使用 B 身体中的“任何一张”牌
  */
-export function findBestRobberyFromHand(attackerTiles, targetTiles, isShangJia) {
+export function findBestRobberyFromHand(attackerTiles, targetTiles, isShangJia, isAttackerFull = false) {
     // 1. 扫描是否有可以“杠”的牌 (优先级最高)
     for (let i = 0; i < targetTiles.length; i++) {
         const tile = targetTiles[i];
         if (!tile || tile.isIron) continue;
-        const action = getRobberyAction(attackerTiles, tile, isShangJia);
+        const action = getRobberyAction(attackerTiles, tile, isShangJia, isAttackerFull);
         if (action && action.type === 'kong') return { ...action, tileIndex: i };
     }
+
+    // 如果攻击者已满，不能进行后续的碰和吃判定
+    if (isAttackerFull) return null;
 
     // 2. 扫描是否有可以“碰”的牌
     for (let i = 0; i < targetTiles.length; i++) {
         const tile = targetTiles[i];
         if (!tile || tile.isIron) continue;
-        const action = getRobberyAction(attackerTiles, tile, isShangJia);
+        const action = getRobberyAction(attackerTiles, tile, isShangJia, isAttackerFull);
         if (action && action.type === 'pung') return { ...action, tileIndex: i };
     }
 
@@ -156,7 +216,7 @@ export function findBestRobberyFromHand(attackerTiles, targetTiles, isShangJia) 
         for (let i = 0; i < targetTiles.length; i++) {
             const tile = targetTiles[i];
             if (!tile || tile.isIron) continue;
-            const action = getRobberyAction(attackerTiles, tile, isShangJia);
+            const action = getRobberyAction(attackerTiles, tile, isShangJia, isAttackerFull);
             if (action && action.type === 'chow') return { ...action, tileIndex: i };
         }
     }
