@@ -93,7 +93,7 @@ export const CONFIG = {
     BGM_FADE_DURATION: 1000, // 缩短淡入淡出，增加响应感
     
     // --- 声音空间感与音量设置 ---
-    AUDIO_GAIN_BGM: -15,   // 背景音乐增益 (dB)
+    AUDIO_GAIN_BGM: -10,   // 背景音乐增益 (dB)
     AUDIO_GAIN_VOICE: 0, // 角色语音增益 (dB)
     AUDIO_GAIN_SFX: 0,   // 通用音效增益 (dB) (吃掉食物, 眩晕等)
     

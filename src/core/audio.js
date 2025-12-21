@@ -89,7 +89,9 @@ class AudioManager {
     constructor() {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         this.bufferCache = new Map();
-        this.bgmPlayer = null;
+        // BGM 使用 Web Audio API
+        this.bgmSource = null;
+        this.bgmGainNode = null;
         this.bgmQueue = [];
         this.currentBgmIndex = -1;
         this.voiceQueues = CONFIG.AUDIO_CHARACTERS.map(() => new VoiceQueue());
@@ -97,6 +99,13 @@ class AudioManager {
         this.fadeInterval = null;
         this.isInitialized = false;
         this.listenerSnake = null;
+        this.isGameOverSoundPlaying = false;
+        // BGM 暂停/恢复相关
+        this.bgmStartTime = 0;
+        this.bgmPauseTime = 0;
+        this.isBgmPaused = false;
+        // 优化：记录用户是否已交互，避免频繁 resume
+        this.hasUserInteracted = false;
     }
 
     setListener(snake) {
@@ -104,7 +113,23 @@ class AudioManager {
     }
 
     async initBgm(bgmFiles) {
+        this.isGameOverSoundPlaying = false; // 重置游戏结束标志，允许 BGM 循环
         this.bgmQueue = bgmFiles.map(file => CONFIG.AUDIO_BGM_PATH + file);
+        
+        // 预加载所有 BGM 文件
+        const loadPromises = this.bgmQueue.map(async (path) => {
+            if (this.bufferCache.has(path)) return;
+            try {
+                const response = await fetch(path);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+                this.bufferCache.set(path, audioBuffer);
+            } catch (e) {
+                console.warn(`Failed to preload BGM: ${path}`, e);
+            }
+        });
+        await Promise.all(loadPromises);
+        
         if (this.bgmQueue.length > 0) {
             this.currentBgmIndex = 0;
             await this.playBgm(this.bgmQueue[this.currentBgmIndex]);
@@ -150,40 +175,133 @@ class AudioManager {
     }
 
     async resumeAudio() {
-        if (this.ctx.state === 'suspended') {
-            await this.ctx.resume();
-        }
+        // 优化：只在首次交互或 Context 被暂停时才执行
+        if (!this.hasUserInteracted || (this.ctx && this.ctx.state === 'suspended')) {
+            this.hasUserInteracted = true;
+            
+            // 激活 Web Audio Context
+            if (this.ctx && this.ctx.state === 'suspended') {
+                await this.ctx.resume();
+            }
 
-        if (this.isInitialized) return;
-        if (this.bgmPlayer && this.bgmPlayer.paused) {
-            try {
-                await this.bgmPlayer.play();
+            // 如果 BGM 被暂停了，恢复播放
+            if (this.isBgmPaused && this.bgmSource && this.bgmGainNode) {
+                await this.resumeBgm();
+            } else if (this.bgmSource && !this.isInitialized) {
+                // 首次播放 BGM
                 this.isInitialized = true;
                 await this.fadeIn();
-            } catch (e) {}
+            }
         }
     }
 
     async playBgm(path) {
-        if (this.bgmPlayer) {
+        // 先淡出当前 BGM
+        if (this.bgmSource) {
             await this.fadeOut();
+            this.stopBgmSource();
         }
 
-        this.bgmPlayer = new Audio(path);
-        this.bgmPlayer.loop = false;
-        this.bgmPlayer.volume = 0;
-        this.bgmPlayer.addEventListener('ended', () => {
+        // 确保 Context 已激活
+        if (this.ctx.state === 'suspended') {
+            await this.ctx.resume();
+        }
+
+        // 加载 BGM buffer（应该已经预加载了）
+        let buffer = this.bufferCache.get(path);
+        if (!buffer) {
+            try {
+                const response = await fetch(path);
+                const arrayBuffer = await response.arrayBuffer();
+                buffer = await this.ctx.decodeAudioData(arrayBuffer);
+                this.bufferCache.set(path, buffer);
+            } catch (e) {
+                console.warn(`Failed to load BGM: ${path}`, e);
+                return;
+            }
+        }
+
+        // 创建 Web Audio API 的 source 和 gain node
+        this.bgmSource = this.ctx.createBufferSource();
+        this.bgmSource.buffer = buffer;
+        this.bgmSource.loop = false; // 不循环，通过 ended 事件切换
+        
+        this.bgmGainNode = this.ctx.createGain();
+        this.bgmGainNode.gain.value = 0; // 初始音量为 0，等待淡入
+        
+        this.bgmSource.connect(this.bgmGainNode);
+        this.bgmGainNode.connect(this.ctx.destination);
+        
+        // 监听结束事件，切换到下一首
+        this.bgmSource.onended = () => {
             if (!this.isGameOverSoundPlaying) {
                 this.playNextBgm();
             }
-        });
+        };
         
         try {
-            await this.bgmPlayer.play();
+            this.bgmStartTime = this.ctx.currentTime;
+            this.bgmPauseTime = 0;
+            this.isBgmPaused = false;
+            this.bgmSource.start(0);
             this.isInitialized = true;
             await this.fadeIn();
         } catch (e) {
-            console.warn("BGM play deferred until user interaction.");
+            console.warn("BGM play failed.", e);
+        }
+    }
+
+    async resumeBgm() {
+        if (!this.bgmSource || !this.bgmGainNode || !this.isBgmPaused) {
+            return;
+        }
+
+        // 确保 Context 已激活
+        if (this.ctx.state === 'suspended') {
+            await this.ctx.resume();
+        }
+
+        // 计算需要从哪个位置继续播放
+        const buffer = this.bgmSource.buffer;
+        const pauseOffset = this.bgmPauseTime;
+        
+        // 创建新的 source（旧的 source 不能重新 start）
+        const newSource = this.ctx.createBufferSource();
+        newSource.buffer = buffer;
+        newSource.loop = false;
+        newSource.onended = this.bgmSource.onended;
+        
+        newSource.connect(this.bgmGainNode);
+        newSource.start(0, pauseOffset);
+        
+        this.bgmSource = newSource;
+        this.bgmStartTime = this.ctx.currentTime - pauseOffset;
+        this.isBgmPaused = false;
+    }
+
+    pauseBgm() {
+        if (this.bgmSource && !this.isBgmPaused) {
+            // 计算当前播放位置
+            this.bgmPauseTime = this.ctx.currentTime - this.bgmStartTime;
+            try {
+                this.bgmSource.stop();
+            } catch (e) {
+                // 可能已经停止
+            }
+            this.isBgmPaused = true;
+        }
+    }
+
+    stopBgmSource() {
+        if (this.bgmSource) {
+            try {
+                this.bgmSource.stop();
+            } catch (e) {
+                // 可能已经停止
+            }
+            this.bgmSource = null;
+            this.bgmGainNode = null;
+            this.isBgmPaused = false;
         }
     }
 
@@ -194,53 +312,48 @@ class AudioManager {
     }
 
     async stopBgm() {
-        if (this.bgmPlayer) {
+        if (this.bgmSource) {
             await this.fadeOut();
-            this.bgmPlayer = null;
+            this.stopBgmSource();
         }
     }
 
     async playEndSound(isWin) {
         this.isGameOverSoundPlaying = true;
         
-        // 稍微延迟一点播放胜利/失败音乐，给角色的“胡”语音一点时间
-        setTimeout(async () => {
-            await this.stopBgm();
-            
-            const file = isWin ? 'ron_music.mp3' : 'ron_ko.mp3';
-            const path = CONFIG.AUDIO_BASE_PATH + file;
-            
-            // 检查是否有预加载的 buffer，如果有则使用 Web Audio 播放
-            const buffer = this.bufferCache.get(path);
-            if (buffer) {
-                const source = this.ctx.createBufferSource();
-                source.buffer = buffer;
-                const gainNode = this.ctx.createGain();
-                gainNode.gain.value = Math.max(0, Math.min(1, dbToLinear(CONFIG.AUDIO_GAIN_SFX)));
-                source.connect(gainNode);
-                gainNode.connect(this.ctx.destination);
-                source.start(0);
-                // 模拟 bgmPlayer 对象以维持现有逻辑
-                this.bgmPlayer = { 
-                    pause: () => source.stop(),
-                    volume: gainNode.gain.value,
-                    paused: false
-                };
-            } else {
-                this.bgmPlayer = new Audio(path);
-                this.bgmPlayer.volume = Math.max(0, Math.min(1, dbToLinear(CONFIG.AUDIO_GAIN_SFX)));
-                try {
-                    await this.bgmPlayer.play();
-                } catch (e) {
-                    console.error("End sound play failed.", e);
-                }
+        // 暂停 BGM（使用 Web Audio API）
+        this.pauseBgm();
+        
+        const file = isWin ? 'ron_music.mp3' : 'ron_ko.mp3';
+        const path = CONFIG.AUDIO_BASE_PATH + file;
+        
+        // 统一使用 Web Audio API 播放
+        let buffer = this.bufferCache.get(path);
+        if (!buffer) {
+            // 如果没缓存，尝试加载
+            try {
+                const response = await fetch(path);
+                const arrayBuffer = await response.arrayBuffer();
+                buffer = await this.ctx.decodeAudioData(arrayBuffer);
+                this.bufferCache.set(path, buffer);
+            } catch (e) {
+                console.error("End sound load failed.", e);
+                return;
             }
-        }, 100); // 延迟从 0.5s 缩短到 0.1s
+        }
+        
+        const source = this.ctx.createBufferSource();
+        source.buffer = buffer;
+        const gainNode = this.ctx.createGain();
+        gainNode.gain.value = Math.max(0, Math.min(1, dbToLinear(CONFIG.AUDIO_GAIN_SFX)));
+        source.connect(gainNode);
+        gainNode.connect(this.ctx.destination);
+        source.start(0);
     }
 
     fadeIn() {
         return new Promise(resolve => {
-            if (!this.bgmPlayer) return resolve();
+            if (!this.bgmGainNode) return resolve();
             if (this.fadeInterval) clearInterval(this.fadeInterval);
             
             this.isFading = true;
@@ -249,10 +362,10 @@ class AudioManager {
             const targetVolume = Math.max(0, Math.min(1, dbToLinear(CONFIG.AUDIO_GAIN_BGM)));
             
             this.fadeInterval = setInterval(() => {
-                if (this.bgmPlayer && this.bgmPlayer.volume < targetVolume - 0.01) {
-                    this.bgmPlayer.volume = Math.min(targetVolume, this.bgmPlayer.volume + step);
+                if (this.bgmGainNode && this.bgmGainNode.gain.value < targetVolume - 0.01) {
+                    this.bgmGainNode.gain.value = Math.min(targetVolume, this.bgmGainNode.gain.value + step);
                 } else {
-                    if (this.bgmPlayer) this.bgmPlayer.volume = targetVolume;
+                    if (this.bgmGainNode) this.bgmGainNode.gain.value = targetVolume;
                     this.isFading = false;
                     clearInterval(this.fadeInterval);
                     this.fadeInterval = null;
@@ -264,7 +377,7 @@ class AudioManager {
 
     fadeOut() {
         return new Promise(resolve => {
-            if (!this.bgmPlayer) return resolve();
+            if (!this.bgmGainNode) return resolve();
             if (this.fadeInterval) clearInterval(this.fadeInterval);
 
             this.isFading = true;
@@ -272,12 +385,11 @@ class AudioManager {
             const interval = Math.max(10, CONFIG.BGM_FADE_DURATION * step);
 
             this.fadeInterval = setInterval(() => {
-                if (this.bgmPlayer && this.bgmPlayer.volume > 0.05) {
-                    this.bgmPlayer.volume = Math.max(0, this.bgmPlayer.volume - step);
+                if (this.bgmGainNode && this.bgmGainNode.gain.value > 0.05) {
+                    this.bgmGainNode.gain.value = Math.max(0, this.bgmGainNode.gain.value - step);
                 } else {
-                    if (this.bgmPlayer) {
-                        this.bgmPlayer.volume = 0;
-                        this.bgmPlayer.pause();
+                    if (this.bgmGainNode) {
+                        this.bgmGainNode.gain.value = 0;
                     }
                     this.isFading = false;
                     clearInterval(this.fadeInterval);

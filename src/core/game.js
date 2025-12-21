@@ -47,14 +47,14 @@ class Game {
         this.lastTime = 0;
 
         window.addEventListener('keydown', (e) => {
-            if (!this.isAssetsLoaded) return;
             audioManager.resumeAudio();
+            if (!this.isAssetsLoaded) return;
             this.snake.handleInput(e.key);
         });
         window.addEventListener('resize', () => this.resize());
         this.canvas.addEventListener('mousedown', (e) => {
-            if (!this.isAssetsLoaded) return;
             audioManager.resumeAudio();
+            if (!this.isAssetsLoaded) return;
             if (this.isGameOver) return;
             this.discardUI.handleMouseDown(e, this.canvas, (index) => {
                 this.snake.discardTile(index);
