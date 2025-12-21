@@ -8,7 +8,7 @@ import { CONFIG } from './config.js';
 export class AssetManager {
     constructor() {
         this.images = new Map();
-        this.basePath = 'SVG_Background/';
+        this.basePath = '/SVG_Background/';
         // 定义所有麻将牌清单，确保一次性加载
         this.tileList = [];
         this.initTileList();

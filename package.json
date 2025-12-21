@@ -1,0 +1,19 @@
+{
+  "name": "snake_mahjong",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "bugs": {
+    "url": "https://github.com/likeUMR/Snake_Mahjong/issues"
+  },
+  "homepage": "https://github.com/likeUMR/Snake_Mahjong#readme",
+  "devDependencies": {
+    "vite": "^7.3.0"
+  }
+}
