@@ -87,9 +87,9 @@ export const CONFIG = {
         YUAN: 'yuan'  // 中 发 白
     },
     // --- 音频设置 ---
-    AUDIO_BGM_PATH: '/Music_and_Sound_Effect/Background_Music/',
-    AUDIO_VOICE_PATH: '/Music_and_Sound_Effect/Voice/', // 弃用，改用角色文件夹直接路径
-    AUDIO_BASE_PATH: '/Music_and_Sound_Effect/',
+    AUDIO_BGM_PATH: 'Music_and_Sound_Effect/Background_Music/',
+    AUDIO_VOICE_PATH: 'Music_and_Sound_Effect/Voice/', // 弃用，改用角色文件夹直接路径
+    AUDIO_BASE_PATH: 'Music_and_Sound_Effect/',
     BGM_FADE_DURATION: 1000, // 缩短淡入淡出，增加响应感
     
     // --- 声音空间感与音量设置 ---
