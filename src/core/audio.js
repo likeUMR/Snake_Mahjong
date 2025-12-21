@@ -30,7 +30,6 @@ class VoiceQueue {
     async playNext() {
         if (this.queue.length === 0) {
             this.isPlaying = false;
-            this.currentAudio = null;
             return;
         }
 
@@ -38,7 +37,16 @@ class VoiceQueue {
         const item = this.queue.shift();
         
         try {
-            this.currentAudio = new Audio(item.path);
+            const buffer = audioManager.bufferCache.get(item.path);
+            if (!buffer) {
+                // 如果没有预加载，退回到传统的 Audio 对象播放（或者直接跳过）
+                console.warn(`Audio buffer not found for: ${item.path}, skipping.`);
+                this.playNext();
+                return;
+            }
+
+            const source = audioManager.ctx.createBufferSource();
+            source.buffer = buffer;
             
             // 根据音效类型选择增益
             const gainDb = item.spatialParams?.gainType === 'SFX' ? CONFIG.AUDIO_GAIN_SFX : CONFIG.AUDIO_GAIN_VOICE;
@@ -62,11 +70,16 @@ class VoiceQueue {
                 }
             }
 
-            this.currentAudio.volume = Math.max(0, Math.min(1, volume));
-            this.currentAudio.addEventListener('ended', () => this.playNext());
-            await this.currentAudio.play();
+            const gainNode = audioManager.ctx.createGain();
+            gainNode.gain.value = Math.max(0, Math.min(1, volume));
+            
+            source.connect(gainNode);
+            gainNode.connect(audioManager.ctx.destination);
+            
+            source.onended = () => this.playNext();
+            source.start(0);
         } catch (e) {
-            console.warn(`Failed to play voice: ${item.path}`, e);
+            console.warn(`Failed to play voice via Web Audio: ${item.path}`, e);
             this.playNext();
         }
     }
@@ -74,6 +87,8 @@ class VoiceQueue {
 
 class AudioManager {
     constructor() {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.bufferCache = new Map();
         this.bgmPlayer = null;
         this.bgmQueue = [];
         this.currentBgmIndex = -1;
@@ -97,7 +112,7 @@ class AudioManager {
     }
 
     /**
-     * 预加载核心音效，减少游戏过程中的网络请求延迟
+     * 预加载核心音效到 Web Audio API 的 AudioBuffer 中
      */
     async preloadEssential() {
         const essentialFiles = [
@@ -115,26 +130,30 @@ class AudioManager {
             });
         });
 
-        const promises = essentialFiles.map(file => {
-            return new Promise(resolve => {
-                const path = CONFIG.AUDIO_BASE_PATH + file;
-                const audio = new Audio();
-                audio.addEventListener('canplaythrough', () => resolve(), { once: true });
-                audio.addEventListener('error', () => {
-                    console.warn(`Failed to preload audio: ${path}`);
-                    resolve();
-                }, { once: true });
-                audio.src = path;
-                audio.load(); // 触发加载
-            });
+        const loadPromises = essentialFiles.map(async (file) => {
+            const path = CONFIG.AUDIO_BASE_PATH + file;
+            if (this.bufferCache.has(path)) return;
+
+            try {
+                const response = await fetch(path);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+                this.bufferCache.set(path, audioBuffer);
+            } catch (e) {
+                console.warn(`Failed to preload/decode audio: ${path}`, e);
+            }
         });
 
-        // 设定一个超时，防止音效加载太久阻塞游戏
-        const timeout = new Promise(resolve => setTimeout(resolve, 5000));
-        await Promise.race([Promise.all(promises), timeout]);
+        // 设定一个稍微长一点的超时，Web Audio 解码需要时间
+        const timeout = new Promise(resolve => setTimeout(resolve, 8000));
+        await Promise.race([Promise.all(loadPromises), timeout]);
     }
 
     async resumeAudio() {
+        if (this.ctx.state === 'suspended') {
+            await this.ctx.resume();
+        }
+
         if (this.isInitialized) return;
         if (this.bgmPlayer && this.bgmPlayer.paused) {
             try {
@@ -191,14 +210,32 @@ class AudioManager {
             const file = isWin ? 'ron_music.mp3' : 'ron_ko.mp3';
             const path = CONFIG.AUDIO_BASE_PATH + file;
             
-            this.bgmPlayer = new Audio(path);
-            this.bgmPlayer.volume = Math.max(0, Math.min(1, dbToLinear(CONFIG.AUDIO_GAIN_SFX)));
-            try {
-                await this.bgmPlayer.play();
-            } catch (e) {
-                console.error("End sound play failed.", e);
+            // 检查是否有预加载的 buffer，如果有则使用 Web Audio 播放
+            const buffer = this.bufferCache.get(path);
+            if (buffer) {
+                const source = this.ctx.createBufferSource();
+                source.buffer = buffer;
+                const gainNode = this.ctx.createGain();
+                gainNode.gain.value = Math.max(0, Math.min(1, dbToLinear(CONFIG.AUDIO_GAIN_SFX)));
+                source.connect(gainNode);
+                gainNode.connect(this.ctx.destination);
+                source.start(0);
+                // 模拟 bgmPlayer 对象以维持现有逻辑
+                this.bgmPlayer = { 
+                    pause: () => source.stop(),
+                    volume: gainNode.gain.value,
+                    paused: false
+                };
+            } else {
+                this.bgmPlayer = new Audio(path);
+                this.bgmPlayer.volume = Math.max(0, Math.min(1, dbToLinear(CONFIG.AUDIO_GAIN_SFX)));
+                try {
+                    await this.bgmPlayer.play();
+                } catch (e) {
+                    console.error("End sound play failed.", e);
+                }
             }
-        }, 500); // 延迟 0.5s
+        }, 100); // 延迟从 0.5s 缩短到 0.1s
     }
 
     fadeIn() {
