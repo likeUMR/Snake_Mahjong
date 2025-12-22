@@ -37,7 +37,10 @@ class AudioManager {
             if (muted) {
                 this.bgmPlayer.pauseBgm();
             } else {
-                if (window.gameInstance && window.gameInstance.state === window.gameInstance.GAME_STATE.PLAYING) {
+                const isPlaying = window.gameInstance && 
+                                  window.gameInstance.state === window.gameInstance.GAME_STATE.PLAYING && 
+                                  !window.gameInstance.world.isGameOver;
+                if (isPlaying) {
                     this.bgmPlayer.resumeBgm();
                 }
             }
@@ -78,7 +81,11 @@ class AudioManager {
         }
 
         if (this.bgmPlayer && !this.isMuted) {
-            if (this.bgmPlayer.isBgmPaused) {
+            const isPlaying = window.gameInstance && 
+                              window.gameInstance.state === window.gameInstance.GAME_STATE.PLAYING && 
+                              !window.gameInstance.world.isGameOver;
+
+            if (this.bgmPlayer.isBgmPaused && isPlaying) {
                 await this.bgmPlayer.resumeBgm();
             } else if (this.bgmPlayer.bgmSource && !this.isInitialized) {
                 this.isInitialized = true;

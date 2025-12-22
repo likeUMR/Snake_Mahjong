@@ -6,6 +6,7 @@ import { checkPotentialCollision } from '../logic/collisionLogic.js';
 import { AIController } from '../ai/AIController.js';
 import { getRobberyAction, findBestRobberyFromHand } from '../logic/mahjongLogic.js';
 import { audioManager } from './audio.js';
+import { victoryEffect } from '../ui/VictoryEffect.js';
 
 export class World {
     constructor() {
@@ -252,6 +253,8 @@ export class World {
         if (snake === this.playerSnake) {
             const result = storageManager.saveRecord(CONFIG.AI_DIFFICULTY, this.playerSnake.score, true);
             this.isNewRecord = result.newHighScore;
+            // 触发胜利特效
+            victoryEffect.trigger();
         } else {
             this.isNewRecord = false;
         }
