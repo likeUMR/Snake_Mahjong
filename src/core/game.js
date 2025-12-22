@@ -154,11 +154,6 @@ class Game {
         // 核心修复：在这里直接对相机坐标取模，防止数值无限增大导致浮点数精度丢失而卡顿
         this.startScreenCam.x = (this.startScreenCam.x + speedX + wrapWidth) % wrapWidth;
         this.startScreenCam.y = (this.startScreenCam.y + speedY + wrapHeight) % wrapHeight;
-
-        // Debug: 当发生循环跳转时在控制台输出
-        if (Math.abs(this.startScreenCam.x - oldX) > Math.abs(speedX) * 2 || Math.abs(this.startScreenCam.y - oldY) > Math.abs(speedY) * 2) {
-            console.log(`[StartScreen Debug] Camera Wrapped: (${oldX.toFixed(2)}, ${oldY.toFixed(2)}) -> (${this.startScreenCam.x.toFixed(2)}, ${this.startScreenCam.y.toFixed(2)})`);
-        }
     }
 
     drawInfiniteBackground(ctx, width, height) {

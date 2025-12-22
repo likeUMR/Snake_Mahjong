@@ -268,10 +268,10 @@ export class StartScreen {
             const btnHeight = CONFIG.START_SCREEN_BTN_HEIGHT * s;
             const spacing = CONFIG.START_SCREEN_BTN_SPACING * s;
             const difficulties = [
-                { id: 'EASY', label: '简单 (Easy)', color: '#2ecc71' },
-                { id: 'NORMAL', label: '普通 (Normal)', color: '#3498db' },
-                { id: 'HARD', label: '困难 (Hard)', color: '#e67e22' },
-                { id: 'IMPOSSIBLE', label: '不可能 (Hell)', color: '#e74c3c' }
+                { id: 'EASY', label: '简单', color: '#2ecc71' },
+                { id: 'NORMAL', label: '普通', color: '#3498db' },
+                { id: 'HARD', label: '困难', color: '#e67e22' },
+                { id: 'IMPOSSIBLE', label: '不可能', color: '#e74c3c' }
             ];
 
             const totalWidth = difficulties.length * btnWidth + (difficulties.length - 1) * spacing;

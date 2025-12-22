@@ -90,8 +90,8 @@ export const CONFIG = {
     END_SCREEN_SCORE_SIZE: 30, // 基础分数列表大小 (px)
 
     // --- 开始界面 UI 设置 ---
-    START_SCREEN_TITLE: '麻将贪吃蛇 (Snake Mahjong)',
-    START_SCREEN_TITLE_SIZE: 80,
+    START_SCREEN_TITLE: '麻将贪吃蛇',
+    START_SCREEN_TITLE_SIZE: 200,
     START_SCREEN_BTN_WIDTH: 200,
     START_SCREEN_BTN_HEIGHT: 60,
     START_SCREEN_BTN_SPACING: 20,
