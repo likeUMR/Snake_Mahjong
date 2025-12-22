@@ -104,7 +104,7 @@ export const CONFIG = {
     START_SCREEN_PROGRESS_HEIGHT: 30,
     START_SCREEN_BTN_FONT_SIZE: 24,
     START_SCREEN_VERTICAL_FOV: 20, // 开始界面垂直方向显示的格数 (越小格子越大)
-    START_SCREEN_CAM_SPEED: 2, // 移动速度 (格/秒)
+    START_SCREEN_CAM_SPEED: 1.5, // 移动速度 (格/秒)
 
     // Status display settings
     START_SCREEN_STATUS_FONT_SIZE: 16,

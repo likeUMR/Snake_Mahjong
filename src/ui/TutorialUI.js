@@ -1,10 +1,14 @@
 import { CONFIG } from '../core/config.js';
+import { isMobile } from '../core/utils.js';
 
 export class TutorialUI {
     constructor() {
-        this.lines = [
+    }
+
+    getLines() {
+        return [
             '教程：',
-            'wasd控制移动',
+            isMobile() ? '虚拟摇杆控制移动' : 'WASD控制移动',
             '通过碰撞达成吃、碰、杠、胡',
             '任意玩家胡牌则游戏结束'
         ];
@@ -24,7 +28,8 @@ export class TutorialUI {
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         
-        this.lines.forEach((line, index) => {
+        const lines = this.getLines();
+        lines.forEach((line, index) => {
             // 确保坐标为整数以获得最清晰的像素效果
             const lineX = Math.round(x);
             const lineY = Math.round(y + index * lineHeight);

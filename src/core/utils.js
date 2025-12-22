@@ -170,6 +170,14 @@ export class StorageManager {
 export const storageManager = new StorageManager();
 
 /**
+ * Detects if the current device is mobile.
+ */
+export function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+           (window.innerWidth < 1024 && 'ontouchstart' in window);
+}
+
+/**
  * Generates a random position on the grid.
  */
 export function getRandomGridPosition() {
