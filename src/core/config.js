@@ -23,16 +23,28 @@ export const CONFIG = {
     // AI settings
     AI_MOVE_INTERVAL_MIN: 1000, // ms
     AI_MOVE_INTERVAL_MAX: 3000, // ms
+    
+    // --- 难度设置 ---
+    AI_DIFFICULTY: 'NORMAL', // 可选值: 'EASY', 'NORMAL', 'HARD', 'IMPOSSIBLE'
+    AI_DIFFICULTY_SETTINGS: {
+        EASY:       { wander: 3000, chase: 1000, escape: 1000, forage: 3000 },
+        NORMAL:     { wander: 1500, chase: 1500, escape: 2000, forage: 2000 },
+        HARD:       { wander: 800,  chase: 2000, escape: 2500, forage: 1000 },
+        IMPOSSIBLE: { wander: 200,  chase: 3000, escape: 3000, forage: 200 }
+    },
+
+    // 动态获取当前难度的参数 (这样 AIController.js 不需要改动任何代码)
+    get AI_STATE_WANDER_TIME() { return this.AI_DIFFICULTY_SETTINGS[this.AI_DIFFICULTY].wander; },
+    get AI_STATE_CHASE_TIME() { return this.AI_DIFFICULTY_SETTINGS[this.AI_DIFFICULTY].chase; },
+    get AI_STATE_ESCAPE_TIME() { return this.AI_DIFFICULTY_SETTINGS[this.AI_DIFFICULTY].escape; },
+    get AI_STATE_FORAGE_TIME() { return this.AI_DIFFICULTY_SETTINGS[this.AI_DIFFICULTY].forage; },
+
     AI_LABELS: {
         XIA_JIA: { text: '下家', color: '#e74c3c' }, // Red
         DUI_JIA: { text: '对家', color: '#bdc3c7' }, // Light Gray (was #ffffff)
         SHANG_JIA: { text: '上家', color: '#2ecc71' } // Green
     },
-    AI_STATE_WANDER_TIME: 1000, // 游走状态持续时间 (ms)
-    AI_STATE_CHASE_TIME: 3000,  // 追逐状态最长时间 (ms)
-    AI_STATE_ESCAPE_TIME: 3000, // 逃跑状态最长时间 (ms)
-    AI_STATE_FORAGE_TIME: 2000, // 觅食状态最长时间 (ms)
-    
+
     // Discard UI settings
     DISCARD_UI_WIDTH: 60,       // 单张牌宽度
     DISCARD_UI_HEIGHT: 80,      // 单张牌高度
@@ -123,6 +135,7 @@ export const CONFIG = {
         'hu_tsumo': 'act_tumo',
         'game_top': 'game_top', // 增加 game_top 映射
         'eat_food': 'eat_food',
+        'discard_tile': 'discard_tile',
         'fulu': 'fulu',
         'xuanyun': 'xuanyun'
     },

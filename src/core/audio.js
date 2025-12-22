@@ -182,6 +182,7 @@ class AudioManager {
     async preloadEssential() {
         const essentialFiles = [
             'eat_food.mp3',
+            'discard_tile.mp3',
             'fulu.mp3',
             'xuanyun.mp3',
             'ron_music.mp3',
@@ -452,7 +453,7 @@ class AudioManager {
         const fileName = CONFIG.AUDIO_VOICE_MAP[actionKey];
         if (!fileName) return;
 
-        const commonSounds = ['eat_food', 'fulu', 'xuanyun'];
+        const commonSounds = ['eat_food', 'discard_tile', 'fulu', 'xuanyun'];
         const isCommon = commonSounds.includes(actionKey);
         
         let path;
