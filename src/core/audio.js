@@ -10,6 +10,7 @@ class AudioManager {
         this.voiceManager = null;
         this.hasUserInteracted = false;
         this.isInitialized = false;
+        this.isMuted = false;
     }
 
     get ctx() {
@@ -28,6 +29,19 @@ class AudioManager {
     setListener(snake) {
         this.ctx; // Ensure initialized
         this.voiceManager.setListener(snake);
+    }
+
+    setMuted(muted) {
+        this.isMuted = muted;
+        if (this.bgmPlayer) {
+            if (muted) {
+                this.bgmPlayer.pauseBgm();
+            } else {
+                if (window.gameInstance && window.gameInstance.state === window.gameInstance.GAME_STATE.PLAYING) {
+                    this.bgmPlayer.resumeBgm();
+                }
+            }
+        }
     }
 
     async initBgm() {
@@ -63,7 +77,7 @@ class AudioManager {
             this.hasUserInteracted = true;
         }
 
-        if (this.bgmPlayer) {
+        if (this.bgmPlayer && !this.isMuted) {
             if (this.bgmPlayer.isBgmPaused) {
                 await this.bgmPlayer.resumeBgm();
             } else if (this.bgmPlayer.bgmSource && !this.isInitialized) {
@@ -74,10 +88,12 @@ class AudioManager {
     }
 
     playBgm(path) {
+        if (this.isMuted) return;
         this.bgmPlayer.playBgm(path);
     }
 
     startBgm() {
+        if (this.isMuted) return;
         this.bgmPlayer.startBgm();
     }
 
@@ -86,10 +102,12 @@ class AudioManager {
     }
 
     async playEndSound(isWin) {
+        if (this.isMuted) return;
         await this.bgmPlayer.playEndSound(isWin);
     }
 
     playVoice(roleIndex, actionKey, sourcePos = null) {
+        if (this.isMuted) return;
         this.voiceManager.playVoice(roleIndex, actionKey, sourcePos);
     }
 }

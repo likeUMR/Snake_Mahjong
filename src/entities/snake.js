@@ -326,6 +326,13 @@ export class Snake {
         ctx.fillStyle = tile.isIron ? '#bdc3c7' : '#fff';
         ctx.fillRect(x, y, CONFIG.TILE_WIDTH, CONFIG.TILE_HEIGHT);
         
+        // 叠加一层非常淡的角色颜色
+        ctx.save();
+        ctx.globalAlpha = CONFIG.SNAKE_TILE_OVERLAY_ALPHA;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(x, y, CONFIG.TILE_WIDTH, CONFIG.TILE_HEIGHT);
+        ctx.restore();
+
         // 如果有高亮，绘制边框
         if (highlightColor) {
             ctx.strokeStyle = highlightColor;

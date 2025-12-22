@@ -1,5 +1,5 @@
 import { CONFIG } from './config.js';
-import { DiscardUI, TutorialUI, StartScreen, EndScreenUI, JoystickUI } from '../ui/ui.js';
+import { DiscardUI, TutorialUI, StartScreen, EndScreenUI, JoystickUI, KeyboardHintUI } from '../ui/ui.js';
 import { assetManager, isMobile } from './utils.js';
 import { audioManager } from './audio.js';
 import { Camera } from './Camera.js';
@@ -34,7 +34,8 @@ class Game {
             tutorialUI: new TutorialUI(),
             startScreen: new StartScreen(),
             endScreenUI: new EndScreenUI(),
-            joystick: isMobile() ? new JoystickUI() : null
+            joystick: isMobile() ? new JoystickUI() : null,
+            keyboardHint: !isMobile() ? new KeyboardHintUI() : null
         };
 
         this.inputHandler = new InputHandler(this);

@@ -10,6 +10,7 @@ export class InputHandler {
 
     init() {
         window.addEventListener('keydown', (e) => this.handleKeyDown(e));
+        window.addEventListener('keyup', (e) => this.handleKeyUp(e));
         window.addEventListener('resize', () => this.handleResize());
         this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
 
@@ -20,10 +21,19 @@ export class InputHandler {
     }
 
     handleKeyDown(e) {
+        if (this.game.ui.keyboardHint) {
+            this.game.ui.keyboardHint.updateActiveKeys(e.key, true);
+        }
         if (this.game.state !== this.game.GAME_STATE.PLAYING) return;
         audioManager.resumeAudio();
         if (this.game.world.playerSnake) {
             this.game.world.playerSnake.handleInput(e.key);
+        }
+    }
+
+    handleKeyUp(e) {
+        if (this.game.ui.keyboardHint) {
+            this.game.ui.keyboardHint.updateActiveKeys(e.key, false);
         }
     }
 

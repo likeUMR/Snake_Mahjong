@@ -1,11 +1,15 @@
 import { CONFIG } from '../core/config.js';
 import { storageManager } from '../core/utils.js';
+import { audioManager } from '../core/audio.js';
 
 export class StartScreen {
     constructor() {
         this.buttons = [];
+        this.actionButtons = []; // 为辅助功能按钮准备
         this.isLoaded = false;
         this.progress = 0;
+        this.showTutorial = true;
+        this.isSoundEnabled = true;
     }
 
     update(progress, isLoaded) {
@@ -119,13 +123,98 @@ export class StartScreen {
             ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
             ctx.font = `${20 * s}px Arial`;
             ctx.fillText('请选择难度以开始游戏', width / 2, btnY - 50 * s);
+
+            // 5. Action Buttons (Bottom Right)
+            this.drawActionButtons(ctx, width, height, s);
         }
     }
 
+    drawActionButtons(ctx, width, height, s) {
+        const btnRadius = 25 * s;
+        const spacing = 15 * s;
+        const rightPadding = 15 * s; // 按钮整体再靠边缘一些
+        const bottomPadding = 15 * s;
+
+        // 增加“音”按钮
+        this.actionButtons = [
+            { id: 'sound', x: width - rightPadding - btnRadius * 5 - spacing * 2, y: height - bottomPadding - btnRadius, label: '♫', color: '#9b59b6', active: this.isSoundEnabled },
+            { id: 'tutorial', x: width - rightPadding - btnRadius * 3 - spacing, y: height - bottomPadding - btnRadius, label: '教', color: '#3498db', active: this.showTutorial },
+            { id: 'clear', x: width - rightPadding - btnRadius, y: height - bottomPadding - btnRadius, label: '删', color: '#e74c3c', active: true }
+        ];
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `bold ${20 * s}px Arial`;
+
+        this.actionButtons.forEach(btn => {
+            // Draw circle
+            ctx.fillStyle = btn.color;
+            ctx.globalAlpha = 0.8;
+            ctx.beginPath();
+            ctx.arc(btn.x, btn.y, btnRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw label
+            ctx.fillStyle = '#fff';
+            ctx.globalAlpha = 1;
+            
+            // 音符符号通常比汉字视觉上偏小，单独调大
+            const fontSize = (btn.id === 'sound' ? 26.5 : 20) * s;
+            ctx.font = `bold ${fontSize}px Arial`;
+
+            // 竖直居中优化：增加微调偏移
+            const textY = btn.y + (fontSize * 0.05);
+            ctx.fillText(btn.label, btn.x, textY);
+
+            // 如果关闭，绘制贯穿的单斜线
+            if (btn.active === false) {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3 * s;
+                ctx.beginPath();
+                // 长度调整为直径，方向调整为从左上到右下
+                const offset = btnRadius * Math.cos(Math.PI / 4);
+                ctx.moveTo(btn.x - offset, btn.y - offset);
+                ctx.lineTo(btn.x + offset, btn.y + offset);
+                ctx.stroke();
+            }
+        });
+        ctx.restore();
+    }
+
     handleMouseDown(e, canvas, callback) {
+        if (!this.isLoaded) return false;
+
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
+
+        const s = canvas.height / 1080;
+
+        // Check action buttons first
+        for (const btn of this.actionButtons) {
+            const dist = Math.sqrt((mouseX - btn.x) ** 2 + (mouseY - btn.y) ** 2);
+            if (dist <= 30 * s) { // Adjusted hit area
+                // 1. 先处理逻辑逻辑
+                if (btn.id === 'tutorial') {
+                    this.showTutorial = !this.showTutorial;
+                } else if (btn.id === 'sound') {
+                    this.isSoundEnabled = !this.isSoundEnabled;
+                    audioManager.setMuted(!this.isSoundEnabled);
+                } else if (btn.id === 'clear') {
+                    audioManager.playVoice(0, 'click');
+                    if (confirm('确定要删除所有的最高得分记录吗？此操作不可撤销。')) {
+                        localStorage.removeItem('SNAKE_MAHJONG_RECORDS');
+                        window.location.reload();
+                    }
+                    return true;
+                }
+
+                // 2. 逻辑处理完后试图播放音效 (如果静音了，playVoice 会自动忽略)
+                audioManager.playVoice(0, 'click');
+                return true;
+            }
+        }
 
         for (const btn of this.buttons) {
             if (mouseX >= btn.x && mouseX <= btn.x + btn.width &&

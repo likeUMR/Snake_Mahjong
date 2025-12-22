@@ -77,6 +77,7 @@ export const CONFIG = {
     STUN_DURATION: 3000, // ms
     GHOST_DURATION: 3000, // ms (for Phase 6, but good to have now)
     LABEL_FLOAT_HEIGHT: 0.1, // 以格子高度为单位，向上浮动的高度
+    SNAKE_TILE_OVERLAY_ALPHA: 0.03, // 蛇身体麻将牌叠角色颜色的透明度 (0-1)
 
     // --- 教程 UI 设置 ---
     TUTORIAL_UI_PADDING: 15,

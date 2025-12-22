@@ -69,11 +69,19 @@ export class Renderer {
             return;
         }
 
-        ui.discardUI.draw(this.ctx, this.canvas, world.playerSnake.tiles, camera.uiScale);
-        ui.tutorialUI.draw(this.ctx, camera.uiScale);
-        
-        if (ui.joystick) {
-            ui.joystick.draw(this.ctx, camera.uiScale);
+        const isTutorialEnabled = ui.startScreen.showTutorial;
+
+        if (isTutorialEnabled) {
+            ui.discardUI.draw(this.ctx, this.canvas, world.playerSnake.tiles, camera.uiScale);
+            ui.tutorialUI.draw(this.ctx, camera.uiScale);
+            
+            if (ui.joystick) {
+                ui.joystick.draw(this.ctx, camera.uiScale);
+            }
+
+            if (ui.keyboardHint) {
+                ui.keyboardHint.draw(this.ctx, camera.uiScale);
+            }
         }
         
         this.drawLeaderboard(world, camera.uiScale);
