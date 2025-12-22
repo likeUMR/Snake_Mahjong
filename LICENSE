@@ -1,0 +1,33 @@
+# 项目授权协议 (Project License)
+
+本项目采用 **署名-非商业性使用-禁止演绎 4.0 国际 (CC BY-NC-ND 4.0)** 许可协议。
+
+有关协议详情，请访问：[https://creativecommons.org/licenses/by-nc-nd/4.0/deed.zh](https://creativecommons.org/licenses/by-nc-nd/4.0/deed.zh)
+
+---
+
+### 外部资源与库声明 (External Resources & Libraries)
+
+本项目集成或引用了以下外部资源，其版权归原作者所有，并遵循各自的开源协议：
+
+1. **canvas-confetti**  
+   - 用途：游戏胜利时的彩带特效。
+   - 协议：[MIT License](https://github.com/catdad/canvas-confetti/blob/master/LICENSE)
+   - 引用方式：通过 CDN (jsDelivr) 动态加载。
+
+2. **音频资源 (Audio Assets)**  
+   - 包含《雀魂麻将》等相关游戏的同人/提取资源，仅供学习交流使用，**严禁用于任何商业用途**。其版权归原版权方（如 Catfood Studio / Yostar 等）所有。
+
+3. **SVG 图标 (Mahjong Tile SVGs)**  
+   - 引用自开源可商用麻将资源库，其版权归原作者所有。
+
+---
+
+### 使用须知
+- **署名**：在分发或展示本项目时，必须保留原作者（璃若尘/likehang）的署名。
+- **非商业**：不得将本项目及其任何衍生内容用于商业目的。
+- **禁止演绎**：不得修改本项目内容并进行分发。
+
+### 侵权说明
+
+如有侵权，请在Github中提醒我，我将于确认接收的24小时内删除侵权内容。

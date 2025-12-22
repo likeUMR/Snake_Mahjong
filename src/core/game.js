@@ -61,6 +61,12 @@ class Game {
             essentialPromise
         ]);
 
+        console.log(
+            "开发者：璃若尘（likehang）\nGithub链接：https://github.com/likeUMR/Snake_Mahjong\n使用testWin()直接胜利",
+            // "color: #f1c40f; font-weight: bold; font-size: 16px;",
+            // "color: #3498db; text-decoration: underline;"
+        );
+
         this.state = GAME_STATE.START_SCREEN;
     }
 
