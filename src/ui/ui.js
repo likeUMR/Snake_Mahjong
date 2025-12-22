@@ -212,12 +212,112 @@ export class TutorialUI {
 
                 // 截取剩余部分
                 remaining = remaining.substring(minIndex + firstMatch.text.length);
-            } else {
-                // 绘制最后剩余的文字
-                ctx.fillStyle = CONFIG.TUTORIAL_UI_TEXT_COLOR;
-                ctx.fillText(remaining, currentX, y);
-                remaining = '';
             }
         }
+    }
+}
+
+export class StartScreen {
+    constructor() {
+        this.buttons = [];
+        this.isLoaded = false;
+        this.progress = 0;
+    }
+
+    update(progress, isLoaded) {
+        this.progress = progress;
+        this.isLoaded = isLoaded;
+    }
+
+    draw(ctx, width, height, uiScale) {
+        const s = uiScale;
+        
+        // 1. Background (Semi-transparent to show game background)
+        ctx.fillStyle = 'rgba(44, 62, 80, 0.85)';
+        ctx.fillRect(0, 0, width, height);
+
+        // 2. Title
+        ctx.fillStyle = '#f1c40f';
+        ctx.font = `bold ${CONFIG.START_SCREEN_TITLE_SIZE * s}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(CONFIG.START_SCREEN_TITLE, width / 2, height * 0.3);
+
+        if (!this.isLoaded) {
+            // 3. Loading Progress Bar
+            const pWidth = CONFIG.START_SCREEN_PROGRESS_WIDTH * s;
+            const pHeight = CONFIG.START_SCREEN_PROGRESS_HEIGHT * s;
+            const px = (width - pWidth) / 2;
+            const py = height * 0.6;
+
+            // Background
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fillRect(px, py, pWidth, pHeight);
+
+            // Fill
+            ctx.fillStyle = '#2ecc71';
+            ctx.fillRect(px, py, pWidth * this.progress, pHeight);
+
+            // Text
+            ctx.fillStyle = '#fff';
+            ctx.font = `${20 * s}px Arial`;
+            ctx.fillText(`资源加载中... ${Math.round(this.progress * 100)}%`, width / 2, py + pHeight + 30 * s);
+        } else {
+            // 4. Difficulty Buttons
+            const btnWidth = CONFIG.START_SCREEN_BTN_WIDTH * s;
+            const btnHeight = CONFIG.START_SCREEN_BTN_HEIGHT * s;
+            const spacing = CONFIG.START_SCREEN_BTN_SPACING * s;
+            const difficulties = [
+                { id: 'EASY', label: '简单 (Easy)', color: '#2ecc71' },
+                { id: 'NORMAL', label: '普通 (Normal)', color: '#3498db' },
+                { id: 'HARD', label: '困难 (Hard)', color: '#e67e22' },
+                { id: 'IMPOSSIBLE', label: '不可能 (Hell)', color: '#e74c3c' }
+            ];
+
+            const totalWidth = difficulties.length * btnWidth + (difficulties.length - 1) * spacing;
+            let currentX = (width - totalWidth) / 2;
+            const btnY = height * 0.6;
+
+            this.buttons = [];
+            difficulties.forEach(diff => {
+                const rect = { x: currentX, y: btnY, width: btnWidth, height: btnHeight, id: diff.id };
+                this.buttons.push(rect);
+
+                // Draw button
+                ctx.fillStyle = diff.color;
+                ctx.beginPath();
+                ctx.roundRect(rect.x, rect.y, rect.width, rect.height, 10 * s);
+                ctx.fill();
+
+                // Text
+                ctx.fillStyle = '#fff';
+                ctx.font = `bold ${CONFIG.START_SCREEN_BTN_FONT_SIZE * s}px Arial`;
+                ctx.fillText(diff.label, rect.x + rect.width / 2, rect.y + rect.height / 2);
+
+                currentX += btnWidth + spacing;
+            });
+
+            // "Click to start" tip
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.font = `${20 * s}px Arial`;
+            ctx.fillText('请选择难度以开始游戏', width / 2, btnY - 50 * s);
+        }
+    }
+
+    handleMouseDown(e, canvas, onSelectDifficulty) {
+        if (!this.isLoaded) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left);
+        const mouseY = (e.clientY - rect.top);
+
+        for (const btn of this.buttons) {
+            if (mouseX >= btn.x && mouseX <= btn.x + btn.width &&
+                mouseY >= btn.y && mouseY <= btn.y + btn.height) {
+                onSelectDifficulty(btn.id);
+                return true;
+            }
+        }
+        return false;
     }
 }

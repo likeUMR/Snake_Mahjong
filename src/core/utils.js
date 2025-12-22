@@ -12,6 +12,8 @@ export class AssetManager {
         // 定义所有麻将牌清单，确保一次性加载
         this.tileList = [];
         this.initTileList();
+        this.loadedCount = 0;
+        this.totalCount = 0;
     }
 
     initTileList() {
@@ -33,17 +35,25 @@ export class AssetManager {
     }
 
     async preloadAll() {
+        this.totalCount = this.tileList.length;
+        this.loadedCount = 0;
+
         const promises = this.tileList.map(name => {
             return new Promise((resolve) => {
                 const path = `${this.basePath}${name}.svg`;
                 if (this.images.has(path)) {
+                    this.loadedCount++;
                     resolve();
                     return;
                 }
                 const img = new Image();
-                img.onload = () => resolve();
+                img.onload = () => {
+                    this.loadedCount++;
+                    resolve();
+                };
                 img.onerror = () => {
                     console.warn(`Failed to load asset: ${path}`);
+                    this.loadedCount++;
                     resolve(); // 失败也 resolve，避免阻塞游戏
                 };
                 img.src = path;
@@ -51,6 +61,10 @@ export class AssetManager {
             });
         });
         await Promise.all(promises);
+    }
+
+    getProgress() {
+        return this.totalCount === 0 ? 1 : this.loadedCount / this.totalCount;
     }
 
     getTileImageName(tile) {

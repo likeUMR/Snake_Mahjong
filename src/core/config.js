@@ -89,6 +89,18 @@ export const CONFIG = {
     END_SCREEN_SUBTITLE_SIZE: 40, // 基础副标题大小 (px)
     END_SCREEN_SCORE_SIZE: 30, // 基础分数列表大小 (px)
 
+    // --- 开始界面 UI 设置 ---
+    START_SCREEN_TITLE: '麻将贪吃蛇 (Snake Mahjong)',
+    START_SCREEN_TITLE_SIZE: 80,
+    START_SCREEN_BTN_WIDTH: 200,
+    START_SCREEN_BTN_HEIGHT: 60,
+    START_SCREEN_BTN_SPACING: 20,
+    START_SCREEN_PROGRESS_WIDTH: 600,
+    START_SCREEN_PROGRESS_HEIGHT: 30,
+    START_SCREEN_BTN_FONT_SIZE: 24,
+    START_SCREEN_VERTICAL_FOV: 20, // 开始界面垂直方向显示的格数 (越小格子越大)
+    START_SCREEN_CAM_SPEED: 2, // 移动速度 (格/秒)
+
     // Camera settings
     CAMERA_FOLLOW_SPEED: 0.1, // Smooth follow interpolation factor
     CAMERA_VERTICAL_FOV: 13, // Number of vertical grids to show
@@ -131,11 +143,13 @@ export const CONFIG = {
         'chow': 'act_chi',
         'pung': 'act_pon',
         'kong': 'act_kan',
+        'kakan': 'act_kan',
         'hu_ron': 'act_ron',
         'hu_tsumo': 'act_tumo',
         'game_top': 'game_top', // 增加 game_top 映射
         'eat_food': 'eat_food',
         'discard_tile': 'discard_tile',
+        'click': 'mouseclick',
         'fulu': 'fulu',
         'xuanyun': 'xuanyun'
     },

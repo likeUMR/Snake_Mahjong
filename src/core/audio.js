@@ -106,6 +106,9 @@ class AudioManager {
         this.isBgmPaused = false;
         // 优化：记录用户是否已交互，避免频繁 resume
         this.hasUserInteracted = false;
+
+        this.loadedCount = 0;
+        this.totalCount = 0;
     }
 
     setListener(snake) {
@@ -156,23 +159,31 @@ class AudioManager {
             return;
         }
 
-        // 异步预加载所有 BGM 文件，不阻塞当前流程 (即不 await 这个循环)
-        this.bgmQueue.forEach(async (path) => {
-            if (this.bufferCache.has(path)) return;
+        this.totalCount += this.bgmQueue.length;
+
+        // 修改：改为 await 所有 BGM 加载，以便追踪进度
+        const bgmPromises = this.bgmQueue.map(async (path) => {
+            if (this.bufferCache.has(path)) {
+                this.loadedCount++;
+                return;
+            }
             try {
                 const response = await fetch(path, this.getFetchOptions(path));
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
                 this.bufferCache.set(path, audioBuffer);
+                this.loadedCount++;
             } catch (e) {
                 console.warn(`Failed to preload BGM: ${path}`, e);
+                this.loadedCount++;
             }
         });
         
+        await Promise.all(bgmPromises);
+        
         if (this.bgmQueue.length > 0) {
             this.currentBgmIndex = 0;
-            // 尝试播放第一首，playBgm 内部会处理未加载完成的情况
-            this.playBgm(this.bgmQueue[this.currentBgmIndex]);
+            // 已移除：在此处不再直接播放 BGM，改由游戏正式开始后触发
         }
     }
 
@@ -183,6 +194,7 @@ class AudioManager {
         const essentialFiles = [
             'eat_food.mp3',
             'discard_tile.mp3',
+            'mouseclick.mp3',
             'fulu.mp3',
             'xuanyun.mp3',
             'ron_music.mp3',
@@ -196,23 +208,34 @@ class AudioManager {
             });
         });
 
+        this.totalCount += essentialFiles.length;
+
         const loadPromises = essentialFiles.map(async (file) => {
             const path = CONFIG.AUDIO_BASE_PATH + file;
-            if (this.bufferCache.has(path)) return;
+            if (this.bufferCache.has(path)) {
+                this.loadedCount++;
+                return;
+            }
 
             try {
                 const response = await fetch(path);
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
                 this.bufferCache.set(path, audioBuffer);
+                this.loadedCount++;
             } catch (e) {
                 console.warn(`Failed to preload/decode audio: ${path}`, e);
+                this.loadedCount++;
             }
         });
 
         // 设定一个稍微长一点的超时，Web Audio 解码需要时间
         const timeout = new Promise(resolve => setTimeout(resolve, 8000));
         await Promise.race([Promise.all(loadPromises), timeout]);
+    }
+
+    getProgress() {
+        return this.totalCount === 0 ? 1 : this.loadedCount / this.totalCount;
     }
 
     async resumeAudio() {
@@ -352,6 +375,15 @@ class AudioManager {
         await this.playBgm(this.bgmQueue[this.currentBgmIndex]);
     }
 
+    /**
+     * 开始播放第一首 BGM (用于从开始界面进入游戏时)
+     */
+    startBgm() {
+        if (this.bgmQueue.length > 0 && this.currentBgmIndex === 0 && !this.bgmSource) {
+            this.playBgm(this.bgmQueue[0]);
+        }
+    }
+
     async stopBgm() {
         if (this.bgmSource) {
             await this.fadeOut();
@@ -453,7 +485,7 @@ class AudioManager {
         const fileName = CONFIG.AUDIO_VOICE_MAP[actionKey];
         if (!fileName) return;
 
-        const commonSounds = ['eat_food', 'discard_tile', 'fulu', 'xuanyun'];
+        const commonSounds = ['eat_food', 'discard_tile', 'click', 'fulu', 'xuanyun'];
         const isCommon = commonSounds.includes(actionKey);
         
         let path;

@@ -181,7 +181,11 @@ export class Snake {
                 }
             });
             for (const gid in groups) {
-                if (groups[gid].length === 3 && groups[gid][0].type === tile.type && groups[gid][0].value === tile.value) {
+                const group = groups[gid];
+                if (group.length === 3 && 
+                    group[0].type === tile.type && 
+                    group[0].value === tile.value &&
+                    group[1].value === tile.value) { // 确保是刻子而非顺子
                     kakanGroupId = gid;
                     isKong = true;
                     break;

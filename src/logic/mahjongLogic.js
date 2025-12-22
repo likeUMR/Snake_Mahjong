@@ -48,6 +48,33 @@ export function canKong(tiles, targetTile) {
 }
 
 /**
+ * 判定加杠：铁牌中是否有一个对应的刻子
+ * 返回该刻子的 groupId
+ */
+export function canKakan(tiles, targetTile) {
+    if (!targetTile) return null;
+    const ironTiles = tiles.filter(t => t && t.isIron);
+    const groups = {};
+    ironTiles.forEach(t => {
+        if (t.groupId) {
+            if (!groups[t.groupId]) groups[t.groupId] = [];
+            groups[t.groupId].push(t);
+        }
+    });
+
+    for (const gid in groups) {
+        const group = groups[gid];
+        if (group.length === 3 && 
+            group[0].type === targetTile.type && 
+            group[0].value === targetTile.value &&
+            group[1].value === targetTile.value) { // 确保是刻子而非顺子
+            return gid;
+        }
+    }
+    return null;
+}
+
+/**
  * 判定碰：手牌中是否有2张相同的牌
  * 返回参与碰的牌组
  */
@@ -114,6 +141,12 @@ export function getRobberyAction(attackerTiles, targetTile, isShangJia, isAttack
     let involvedTiles = canKong(attackerTiles, targetTile);
     if (involvedTiles) {
         return { type: 'kong', involvedTiles, effectText: '杠！', isKong: true };
+    }
+
+    // 1.5 判定加杠
+    const kakanGroupId = canKakan(attackerTiles, targetTile);
+    if (kakanGroupId) {
+        return { type: 'kakan', kakanGroupId, effectText: '加杠！', isKong: true };
     }
 
     // 如果攻击者已满，不能进行后续的碰和吃判定
@@ -207,7 +240,7 @@ export function findBestRobberyFromHand(attackerTiles, targetTiles, isShangJia, 
         const tile = targetTiles[i];
         if (!tile || tile.isIron) continue;
         const action = getRobberyAction(attackerTiles, tile, isShangJia, isAttackerFull, attackerMaxTiles);
-        if (action && action.type === 'kong') return { ...action, tileIndex: i };
+        if (action && (action.type === 'kong' || action.type === 'kakan')) return { ...action, tileIndex: i };
     }
 
     // 如果攻击者已满，不能进行后续的碰和吃判定
