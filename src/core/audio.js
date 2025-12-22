@@ -112,10 +112,32 @@ class AudioManager {
         this.listenerSnake = snake;
     }
 
-    async initBgm(bgmFiles) {
+    async initBgm() {
         this.isGameOverSoundPlaying = false; // 重置游戏结束标志，允许 BGM 循环
-        this.bgmQueue = bgmFiles.map(file => CONFIG.AUDIO_BGM_PATH + file);
         
+        // 1. 获取本地 mp3 文件
+        const localMp3Files = import.meta.glob('../../public/Music_and_Sound_Effect/Background_Music/*.mp3');
+        const localBgms = Object.keys(localMp3Files).map(path => {
+            const fileName = path.split('/').pop();
+            return CONFIG.AUDIO_BGM_PATH + fileName;
+        });
+
+        // 2. 获取并解析 txt 列表文件中的网络资源
+        const txtFiles = import.meta.glob('../../public/Music_and_Sound_Effect/Background_Music/*.txt', { as: 'raw', eager: true });
+        const remoteBgms = [];
+        for (const path in txtFiles) {
+            const content = txtFiles[path];
+            const lines = content.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+            remoteBgms.push(...lines);
+        }
+
+        this.bgmQueue = [...localBgms, ...remoteBgms];
+        
+        if (this.bgmQueue.length === 0) {
+            console.warn("No BGM files found in Background_Music folder or txt links.");
+            return;
+        }
+
         // 预加载所有 BGM 文件
         const loadPromises = this.bgmQueue.map(async (path) => {
             if (this.bufferCache.has(path)) return;

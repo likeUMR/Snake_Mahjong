@@ -66,8 +66,8 @@ class Game {
     }
 
     async init() {
-        // 1. 初始化 BGM 清单
-        audioManager.initBgm(['game_master.mp3', 'game.mp3']);
+        // 1. 初始化 BGM 清单 (空列表表示稍后在 audioManager 中动态检测)
+        await audioManager.initBgm();
         audioManager.setListener(this.snake); 
 
         // 2. 并行加载资源
@@ -352,12 +352,18 @@ class Game {
             return;
         }
 
-        this.ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+        this.ctx.fillStyle = CONFIG.GRID_OUTSIDE_COLOR;
+        this.ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
         this.ctx.save();
         this.ctx.translate(logicalWidth / 2, logicalHeight / 2);
         this.ctx.scale(this.scale, this.scale);
         this.ctx.translate(-this.cameraX, -this.cameraY);
         
+        // 绘制地图背景色 (深色，以便与外部区分)
+        this.ctx.fillStyle = CONFIG.GRID_INSIDE_COLOR;
+        this.ctx.fillRect(0, 0, CONFIG.SCENE_GRID_WIDTH * CONFIG.TILE_WIDTH, CONFIG.SCENE_GRID_HEIGHT * CONFIG.TILE_HEIGHT);
+
         this.drawGrid();
         this.foods.forEach(food => food.draw(this.ctx, 0, 0));
         this.snakes.forEach(snake => snake.draw(this.ctx, 0, 0));
@@ -551,8 +557,9 @@ class Game {
     }
 
     drawGrid() {
-        this.ctx.strokeStyle = '#34495e';
-        this.ctx.lineWidth = 1 / this.scale;
+        this.ctx.strokeStyle = CONFIG.GRID_LINE_COLOR;
+        const dpr = window.devicePixelRatio || 1;
+        this.ctx.lineWidth = CONFIG.GRID_LINE_WIDTH / (this.scale * dpr);
         for (let i = 0; i <= CONFIG.SCENE_GRID_WIDTH; i++) {
             this.ctx.beginPath();
             this.ctx.moveTo(i * CONFIG.TILE_WIDTH, 0);
@@ -565,6 +572,11 @@ class Game {
             this.ctx.lineTo(CONFIG.SCENE_GRID_WIDTH * CONFIG.TILE_WIDTH, j * CONFIG.TILE_HEIGHT);
             this.ctx.stroke();
         }
+
+        // 绘制加粗边界线
+        this.ctx.strokeStyle = CONFIG.GRID_BOUNDARY_COLOR;
+        this.ctx.lineWidth = CONFIG.GRID_BOUNDARY_WIDTH / (this.scale * dpr);
+        this.ctx.strokeRect(0, 0, CONFIG.SCENE_GRID_WIDTH * CONFIG.TILE_WIDTH, CONFIG.SCENE_GRID_HEIGHT * CONFIG.TILE_HEIGHT);
     }
 
     loop(time) {

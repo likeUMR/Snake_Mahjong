@@ -7,6 +7,12 @@ export const CONFIG = {
     TILE_HEIGHT: 40,
     SCENE_GRID_WIDTH: 50,  // Number of horizontal grids
     SCENE_GRID_HEIGHT: 50, // Number of vertical grids
+    GRID_OUTSIDE_COLOR: '#1a252f', // 地图以外的颜色
+    GRID_INSIDE_COLOR: '#2c3e50',  // 地图内部背景颜色
+    GRID_LINE_COLOR: '#34495e',    // 普通格子线条颜色
+    GRID_LINE_WIDTH: 2,            // 普通格子线条宽度
+    GRID_BOUNDARY_WIDTH: 5,      // 边界线条宽度
+    GRID_BOUNDARY_COLOR: '#34495e', // 边界线条颜色
     
     // Snake settings
     INITIAL_SNAKE_SPEED: 200, // ms per move
