@@ -88,11 +88,16 @@ export const CONFIG = {
     END_SCREEN_TITLE_SIZE: 100, // 基础标题大小 (px)
     END_SCREEN_SUBTITLE_SIZE: 40, // 基础副标题大小 (px)
     END_SCREEN_SCORE_SIZE: 30, // 基础分数列表大小 (px)
+    END_SCREEN_BTN_WIDTH: 150,
+    END_SCREEN_BTN_HEIGHT: 50,
+    END_SCREEN_BTN_FONT_SIZE: 20,
+    END_SCREEN_BTN_MARGIN: 40, // 距离边缘的距离
 
     // --- 开始界面 UI 设置 ---
     START_SCREEN_TITLE: '麻将贪吃蛇',
     START_SCREEN_TITLE_SIZE: 200,
-    START_SCREEN_BTN_WIDTH: 200,
+    START_SCREEN_TITLE_LETTER_SPACING: 30, // 每个字之间的额外像素间距 (可调)
+    START_SCREEN_BTN_WIDTH: 140,
     START_SCREEN_BTN_HEIGHT: 60,
     START_SCREEN_BTN_SPACING: 20,
     START_SCREEN_PROGRESS_WIDTH: 600,
@@ -100,6 +105,12 @@ export const CONFIG = {
     START_SCREEN_BTN_FONT_SIZE: 24,
     START_SCREEN_VERTICAL_FOV: 20, // 开始界面垂直方向显示的格数 (越小格子越大)
     START_SCREEN_CAM_SPEED: 2, // 移动速度 (格/秒)
+
+    // Status display settings
+    START_SCREEN_STATUS_FONT_SIZE: 16,
+    START_SCREEN_STATUS_COLOR_NOT_CLEARED: '#95a5a6', // Gray
+    START_SCREEN_STATUS_COLOR_CLEARED: '#f1c40f',     // Yellow/Gold
+    START_SCREEN_STATUS_OFFSET_Y: 25,                 // Offset from button bottom
 
     // Camera settings
     CAMERA_FOLLOW_SPEED: 0.1, // Smooth follow interpolation factor

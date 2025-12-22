@@ -1,8 +1,8 @@
 import { CONFIG } from './config.js';
 import { Snake } from '../entities/snake.js';
 import { Food } from '../entities/food.js';
-import { DiscardUI, TutorialUI, StartScreen } from '../ui/ui.js';
-import { getSafeRandomPosition, assetManager } from './utils.js';
+import { DiscardUI, TutorialUI, StartScreen, EndScreenUI } from '../ui/ui.js';
+import { getSafeRandomPosition, assetManager, storageManager } from './utils.js';
 import { checkPotentialCollision } from '../logic/collisionLogic.js';
 import { AIController } from '../ai/AIController.js';
 import { canHu, getRobberyAction, findBestRobberyFromHand } from '../logic/mahjongLogic.js';
@@ -33,10 +33,12 @@ class Game {
         
         this.isGameOver = false;
         this.winner = null;
+        this.isNewRecord = false;
         this.isAssetsLoaded = false; // 新载标志
         this.discardUI = new DiscardUI();
         this.tutorialUI = new TutorialUI();
         this.startScreen = new StartScreen();
+        this.endScreenUI = new EndScreenUI();
         
         this.lastTime = 0;
 
@@ -70,8 +72,17 @@ class Game {
                 return;
             }
 
-            if (this.state !== GAME_STATE.PLAYING) return;
-            if (this.isGameOver) return;
+            if (this.isGameOver) {
+                this.endScreenUI.handleEndMouseDown(e, this.canvas, (action) => {
+                    audioManager.playVoice(0, 'click');
+                    if (action === 'menu') {
+                        this.goToMenu();
+                    } else if (action === 'restart') {
+                        this.restartGame();
+                    }
+                });
+                return;
+            }
 
             this.discardUI.handleMouseDown(e, this.canvas, (index) => {
                 this.snake.discardTile(index);
@@ -446,12 +457,21 @@ class Game {
                     snake.executeMove(nextHead);
                     anySnakeMoved = true;
                 }
+            }
+
+            // Check if this snake has won (could have been from movement or food)
+            if (snake.isWin && !this.isGameOver) {
+                this.isGameOver = true;
+                this.winner = snake;
+                snake.score += CONFIG.SCORE_HU;
+                audioManager.playEndSound(snake === this.snake);
                 
-                if (snake.isWin) {
-                    this.isGameOver = true;
-                    this.winner = snake;
-                    snake.score += CONFIG.SCORE_HU;
-                    audioManager.playEndSound(snake === this.snake);
+                // Persistent storage update: Only record if the player won
+                if (snake === this.snake) {
+                    const result = storageManager.saveRecord(CONFIG.AI_DIFFICULTY, this.snake.score, true);
+                    this.isNewRecord = result.newHighScore;
+                } else {
+                    this.isNewRecord = false;
                 }
             }
         });
@@ -571,6 +591,7 @@ class Game {
                 const winnerController = this.aiControllers.find(c => c.snake === this.winner);
                 this.drawDefeat(winnerController ? winnerController.label : null);
             }
+            this.endScreenUI.draw(this.ctx, width, height, this.uiScale);
         }
     }
 
@@ -710,7 +731,12 @@ class Game {
             if (isPlayer) nameText += ' (你)';
             if (isWinner) nameText += ' ★';
             
-            const text = `${nameText.padEnd(15)} 分数: ${snake.score}`;
+            let scoreText = `${snake.score}`;
+            if (isPlayer && this.isNewRecord) {
+                scoreText += '（新纪录）';
+            }
+            
+            const text = `${nameText.padEnd(15)} 分数: ${scoreText}`;
             this.ctx.fillText(text, logicalWidth / 2, startY + index * entryHeight);
         });
     }
@@ -738,6 +764,36 @@ class Game {
         this.ctx.strokeRect(0, 0, CONFIG.SCENE_GRID_WIDTH * CONFIG.TILE_WIDTH, CONFIG.SCENE_GRID_HEIGHT * CONFIG.TILE_HEIGHT);
     }
 
+    restartGame() {
+        // 重置游戏状态
+        this.isGameOver = false;
+        this.winner = null;
+        this.isNewRecord = false;
+        this.snakes = [];
+        this.aiControllers = [];
+        this.foods = [];
+        this.effects = [];
+        
+        // 重新初始化对象
+        this.setupGameObjects();
+        audioManager.startBgm(); // 重新开始 BGM
+    }
+
+    goToMenu() {
+        // 停止当前游戏逻辑，切换回开始界面
+        this.state = 'start_screen';
+        this.isGameOver = false;
+        this.winner = null;
+        this.isNewRecord = false;
+        this.snakes = [];
+        this.aiControllers = [];
+        this.foods = [];
+        this.effects = [];
+        
+        // 停止 BGM
+        audioManager.stopBgm();
+    }
+
     loop(time) {
         this.update(time);
         this.draw();
@@ -745,4 +801,16 @@ class Game {
     }
 }
 
-new Game();
+window.gameInstance = new Game();
+
+// 测试代码：直接获得胜利
+window.testWin = () => {
+    const game = window.gameInstance;
+    if (game && game.state === 'playing' && !game.isGameOver) {
+        game.snake.isWin = true;
+        game.snake.winResult = { patterns: ['管理员测试胡牌'], score: 0 };
+        console.log("测试：触发胜利逻辑");
+    } else {
+        console.warn("只有在游戏进行中才能触发测试胜利");
+    }
+};

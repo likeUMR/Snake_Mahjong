@@ -104,6 +104,69 @@ export class AssetManager {
 
 export const assetManager = new AssetManager();
 
+// Storage Manager to handle persistence of scores and clear status
+export class StorageManager {
+    constructor() {
+        this.KEY = 'SNAKE_MAHJONG_RECORDS';
+        this.data = this.load();
+    }
+
+    load() {
+        const json = localStorage.getItem(this.KEY);
+        try {
+            return json ? JSON.parse(json) : {};
+        } catch (e) {
+            console.error('Failed to parse storage data', e);
+            return {};
+        }
+    }
+
+    save() {
+        localStorage.setItem(this.KEY, JSON.stringify(this.data));
+    }
+
+    /**
+     * @param {string} difficulty 
+     * @returns {{cleared: boolean, highScore: number}}
+     */
+    getRecord(difficulty) {
+        return this.data[difficulty] || { cleared: false, highScore: 0 };
+    }
+
+    /**
+     * @param {string} difficulty 
+     * @param {number} score 
+     * @param {boolean} won 
+     * @returns {{newHighScore: boolean, firstClear: boolean}}
+     */
+    saveRecord(difficulty, score, won) {
+        if (!won) return { newHighScore: false, firstClear: false };
+
+        if (!this.data[difficulty]) {
+            this.data[difficulty] = { cleared: false, highScore: 0 };
+        }
+        
+        const record = this.data[difficulty];
+        let firstClear = false;
+        let newHighScore = false;
+
+        if (!record.cleared) {
+            record.cleared = true;
+            firstClear = true;
+        }
+        
+        if (score > record.highScore) {
+            record.highScore = score;
+            newHighScore = true;
+        }
+        
+        this.save();
+        return { newHighScore, firstClear };
+    }
+}
+
+export const storageManager = new StorageManager();
+
 /**
  * Generates a random position on the grid.
  */
