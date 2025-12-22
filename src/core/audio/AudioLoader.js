@@ -101,7 +101,7 @@ export class AudioLoader {
             this.loadedCount++;
         });
 
-        const timeout = new Promise(resolve => setTimeout(resolve, 8000));
+        const timeout = new Promise(resolve => setTimeout(resolve, 18000));
         await Promise.race([Promise.all(loadPromises), timeout]);
     }
 
