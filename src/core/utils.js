@@ -11,7 +11,6 @@ export class AssetManager {
         this.basePath = 'SVG_Background/';
         // 定义所有麻将牌清单，确保一次性加载
         this.tileList = [];
-        this.initTileList();
         this.loadedCount = 0;
         this.totalCount = 0;
     }
@@ -35,6 +34,9 @@ export class AssetManager {
     }
 
     async preloadAll() {
+        if (this.tileList.length === 0) {
+            this.initTileList();
+        }
         this.totalCount = this.tileList.length;
         this.loadedCount = 0;
 

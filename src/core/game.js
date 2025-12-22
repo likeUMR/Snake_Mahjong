@@ -42,15 +42,9 @@ class Game {
         
         this.lastTime = 0;
 
-        // 初始化开始界面动画参数
-        const angle = Math.random() * Math.PI * 2;
-        this.startScreenCam = {
-            x: Math.random() * 1000,
-            y: Math.random() * 1000,
-            vx: Math.cos(angle),
-            vy: Math.sin(angle)
-        };
-        this.decorationTiles = this.generateDecorationTiles();
+        // 初始化开始界面动画参数 (移至 init 中延迟初始化以优化首帧)
+        this.startScreenCam = null;
+        this.decorationTiles = [];
 
         window.addEventListener('keydown', (e) => {
             if (this.state !== GAME_STATE.PLAYING) return;
@@ -94,8 +88,21 @@ class Game {
     }
 
     async init() {
-        // 开始循环，显示加载进度
+        // A. 立即启动循环，使浏览器能尽快处理首帧渲染 (此时显示 LOADING 状态)
         requestAnimationFrame((time) => this.loop(time));
+
+        // B. 强制交出线程控制权，确保浏览器有时间完成 First Paint (显示进度条背景)
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        // C. 延迟初始化非核心计算项
+        const angle = Math.random() * Math.PI * 2;
+        this.startScreenCam = {
+            x: Math.random() * 1000,
+            y: Math.random() * 1000,
+            vx: Math.cos(angle),
+            vy: Math.sin(angle)
+        };
+        this.decorationTiles = this.generateDecorationTiles();
 
         // 1. 初始化 BGM 清单 (异步执行，不阻塞游戏启动)
         // 注意：audioManager.initBgm 现在内部会 await BGM 加载
@@ -152,6 +159,7 @@ class Game {
     }
 
     updateStartScreenAnim(deltaTime) {
+        if (!this.startScreenCam) return;
         // 速度单位换算：速度(格/秒) * (毫秒/1000) * 格子像素大小
         const speedX = this.startScreenCam.vx * CONFIG.START_SCREEN_CAM_SPEED * (deltaTime / 1000) * CONFIG.TILE_WIDTH;
         const speedY = this.startScreenCam.vy * CONFIG.START_SCREEN_CAM_SPEED * (deltaTime / 1000) * CONFIG.TILE_HEIGHT;
@@ -168,6 +176,7 @@ class Game {
     }
 
     drawInfiniteBackground(ctx, width, height) {
+        if (!this.startScreenCam) return;
         const cam = this.startScreenCam;
         const tw = CONFIG.TILE_WIDTH;
         const th = CONFIG.TILE_HEIGHT;

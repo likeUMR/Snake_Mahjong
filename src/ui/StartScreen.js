@@ -97,7 +97,9 @@ export class StartScreen {
                 // Text
                 ctx.fillStyle = '#fff';
                 ctx.font = `bold ${CONFIG.START_SCREEN_BTN_FONT_SIZE * s}px Arial`;
-                ctx.fillText(diff.label, rect.x + rect.width / 2, rect.y + rect.height / 2);
+                // 修正文字纵向居中：增加一个微小的偏移量
+                const btnTextY = rect.y + rect.height / 2 + (CONFIG.START_SCREEN_BTN_FONT_SIZE * s * 0.05);
+                ctx.fillText(diff.label, rect.x + rect.width / 2, btnTextY);
 
                 // Status text below button
                 const record = storageManager.getRecord(diff.id);

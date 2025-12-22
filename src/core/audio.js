@@ -87,7 +87,7 @@ class VoiceQueue {
 
 class AudioManager {
     constructor() {
-        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this._ctx = null;
         this.bufferCache = new Map();
         // BGM 使用 Web Audio API
         this.bgmSource = null;
@@ -109,6 +109,13 @@ class AudioManager {
 
         this.loadedCount = 0;
         this.totalCount = 0;
+    }
+
+    get ctx() {
+        if (!this._ctx) {
+            this._ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        return this._ctx;
     }
 
     setListener(snake) {
