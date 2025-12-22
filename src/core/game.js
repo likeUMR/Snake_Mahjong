@@ -66,11 +66,11 @@ class Game {
     }
 
     async init() {
-        // 1. 初始化 BGM 清单 (空列表表示稍后在 audioManager 中动态检测)
-        await audioManager.initBgm();
+        // 1. 初始化 BGM 清单 (异步执行，不阻塞游戏启动)
+        audioManager.initBgm();
         audioManager.setListener(this.snake); 
 
-        // 2. 并行加载资源
+        // 2. 并行加载核心资源 (图像和关键音效)
         await Promise.all([
             assetManager.preloadAll(),
             audioManager.preloadEssential()

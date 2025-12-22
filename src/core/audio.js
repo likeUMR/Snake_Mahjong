@@ -112,6 +112,24 @@ class AudioManager {
         this.listenerSnake = snake;
     }
 
+    /**
+     * 获取带有真实请求头的 fetch 选项 (用于绕过一些简单的 User-Agent 检查)
+     */
+    getFetchOptions(path) {
+        const isRemote = path.startsWith('http');
+        if (!isRemote) return {};
+
+        return {
+            headers: {
+                'sec-ch-ua': '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-platform': '"Windows"',
+                'upgrade-insecure-requests': '1',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+            }
+        };
+    }
+
     async initBgm() {
         this.isGameOverSoundPlaying = false; // 重置游戏结束标志，允许 BGM 循环
         
@@ -138,11 +156,11 @@ class AudioManager {
             return;
         }
 
-        // 预加载所有 BGM 文件
-        const loadPromises = this.bgmQueue.map(async (path) => {
+        // 异步预加载所有 BGM 文件，不阻塞当前流程 (即不 await 这个循环)
+        this.bgmQueue.forEach(async (path) => {
             if (this.bufferCache.has(path)) return;
             try {
-                const response = await fetch(path);
+                const response = await fetch(path, this.getFetchOptions(path));
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
                 this.bufferCache.set(path, audioBuffer);
@@ -150,11 +168,11 @@ class AudioManager {
                 console.warn(`Failed to preload BGM: ${path}`, e);
             }
         });
-        await Promise.all(loadPromises);
         
         if (this.bgmQueue.length > 0) {
             this.currentBgmIndex = 0;
-            await this.playBgm(this.bgmQueue[this.currentBgmIndex]);
+            // 尝试播放第一首，playBgm 内部会处理未加载完成的情况
+            this.playBgm(this.bgmQueue[this.currentBgmIndex]);
         }
     }
 
@@ -233,7 +251,7 @@ class AudioManager {
         let buffer = this.bufferCache.get(path);
         if (!buffer) {
             try {
-                const response = await fetch(path);
+                const response = await fetch(path, this.getFetchOptions(path));
                 const arrayBuffer = await response.arrayBuffer();
                 buffer = await this.ctx.decodeAudioData(arrayBuffer);
                 this.bufferCache.set(path, buffer);
