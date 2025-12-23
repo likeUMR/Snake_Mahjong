@@ -26,7 +26,7 @@ export class VictoryEffect {
                 spread: 70,
                 origin: { x: x, y: y },
                 colors: colors,
-                zIndex: 2000
+                zIndex: 3000 // 提高层级确保在 UI 之上
             });
         };
 
@@ -54,14 +54,16 @@ export class VictoryEffect {
                 angle: 60,
                 spread: 55,
                 origin: { x: 0, y: 0.8 },
-                colors: ['#f1c40f', '#3498db']
+                colors: ['#f1c40f', '#3498db'],
+                zIndex: 3000 // 移动端必须补上 zIndex
             });
             confetti({
                 particleCount: 2,
                 angle: 120,
                 spread: 55,
                 origin: { x: 1, y: 0.8 },
-                colors: ['#e74c3c', '#2ecc71']
+                colors: ['#e74c3c', '#2ecc71'],
+                zIndex: 3000 // 移动端必须补上 zIndex
             });
 
             if (Date.now() < end) {
