@@ -21,14 +21,12 @@ export class JoystickUI {
             const x = touch.clientX - rect.left;
             const y = touch.clientY - rect.top;
 
-            // Simple rule: joystick is on the left half of the screen
-            if (x < canvas.width / (2 * (window.devicePixelRatio || 1))) {
-                this.active = true;
-                this.touchId = touch.identifier;
-                this.basePos = { x, y };
-                this.stickPos = { x, y };
-                return true;
-            }
+            // 全屏幕范围均可触发摇杆 (优先级低于 UI 判定)
+            this.active = true;
+            this.touchId = touch.identifier;
+            this.basePos = { x, y };
+            this.stickPos = { x, y };
+            return true;
         }
         return false;
     }

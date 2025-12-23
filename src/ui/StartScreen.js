@@ -135,9 +135,12 @@ export class StartScreen {
         const rightPadding = 15 * s; // 按钮整体再靠边缘一些
         const bottomPadding = 15 * s;
 
-        // 增加“音”按钮
+        const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+
+        // 增加“全”按钮，放置在最左侧
         this.actionButtons = [
-            { id: 'sound', x: width - rightPadding - btnRadius * 5 - spacing * 2, y: height - bottomPadding - btnRadius, label: '♫', color: '#9b59b6', active: this.isSoundEnabled },
+            { id: 'fullscreen', x: width - rightPadding - btnRadius * 7 - spacing * 3, y: height - bottomPadding - btnRadius, label: '全', color: '#3498db', active: isFullscreen },
+            { id: 'sound', x: width - rightPadding - btnRadius * 5 - spacing * 2, y: height - bottomPadding - btnRadius, label: '♫', color: '#3498db', active: this.isSoundEnabled },
             { id: 'tutorial', x: width - rightPadding - btnRadius * 3 - spacing, y: height - bottomPadding - btnRadius, label: '教', color: '#3498db', active: this.showTutorial },
             { id: 'clear', x: width - rightPadding - btnRadius, y: height - bottomPadding - btnRadius, label: '删', color: '#e74c3c', active: true }
         ];
@@ -182,6 +185,35 @@ export class StartScreen {
         ctx.restore();
     }
 
+    toggleFullscreen() {
+        if (!document.fullscreenElement && 
+            !document.webkitFullscreenElement && 
+            !document.mozFullScreenElement && 
+            !document.msFullscreenElement) {
+            
+            const docEl = document.documentElement;
+            if (docEl.requestFullscreen) {
+                docEl.requestFullscreen();
+            } else if (docEl.webkitRequestFullscreen) {
+                docEl.webkitRequestFullscreen();
+            } else if (docEl.mozRequestFullScreen) {
+                docEl.mozRequestFullScreen();
+            } else if (docEl.msRequestFullscreen) {
+                docEl.msRequestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+    }
+
     handleMouseDown(e, canvas, callback) {
         if (!this.isLoaded) return false;
 
@@ -196,7 +228,9 @@ export class StartScreen {
             const dist = Math.sqrt((mouseX - btn.x) ** 2 + (mouseY - btn.y) ** 2);
             if (dist <= 30 * s) { // Adjusted hit area
                 // 1. 先处理逻辑逻辑
-                if (btn.id === 'tutorial') {
+                if (btn.id === 'fullscreen') {
+                    this.toggleFullscreen();
+                } else if (btn.id === 'tutorial') {
                     this.showTutorial = !this.showTutorial;
                 } else if (btn.id === 'sound') {
                     this.isSoundEnabled = !this.isSoundEnabled;

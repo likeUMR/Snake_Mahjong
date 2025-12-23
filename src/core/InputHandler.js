@@ -41,26 +41,40 @@ export class InputHandler {
         e.preventDefault();
         audioManager.resumeAudio();
 
-        // 1. Check joystick
-        if (this.game.ui.joystick && this.game.state === this.game.GAME_STATE.PLAYING) {
-            if (this.game.ui.joystick.handleTouchStart(e, this.canvas)) {
-                return;
-            }
-        }
-
-        // 2. Fallback to click logic (converted for touch)
+        // 转换为鼠标事件坐标进行 UI 判定
         const touch = e.changedTouches[0];
         const fakeEvent = {
             clientX: touch.clientX,
             clientY: touch.clientY,
             preventDefault: () => {}
         };
+
+        // 1. 如果在游戏中且未结束，优先判定是否点击了底部的弃牌区
+        if (this.game.state === this.game.GAME_STATE.PLAYING && !this.game.world.isGameOver) {
+            let hitDiscard = false;
+            this.game.ui.discardUI.handleMouseDown(fakeEvent, this.canvas, (index) => {
+                if (this.game.world.playerSnake) {
+                    this.game.world.playerSnake.discardTile(index);
+                }
+                hitDiscard = true;
+            });
+            if (hitDiscard) return;
+        }
+
+        // 2. 检查摇杆 (现在是全屏幕判定)
+        if (this.game.ui.joystick && this.game.state === this.game.GAME_STATE.PLAYING && !this.game.world.isGameOver) {
+            if (this.game.ui.joystick.handleTouchStart(e, this.canvas)) {
+                return;
+            }
+        }
+
+        // 3. 其他兜底逻辑（如点击开始按钮、返回菜单等）
         this.handleMouseDown(fakeEvent);
     }
 
     handleTouchMove(e) {
         e.preventDefault();
-        if (this.game.ui.joystick && this.game.state === this.game.GAME_STATE.PLAYING) {
+        if (this.game.ui.joystick && this.game.state === this.game.GAME_STATE.PLAYING && !this.game.world.isGameOver) {
             if (this.game.ui.joystick.handleTouchMove(e, this.canvas)) {
                 if (this.game.world.playerSnake && this.game.ui.joystick.inputDirection) {
                     this.game.world.playerSnake.handleInput(this.game.ui.joystick.inputDirection);

@@ -40,16 +40,15 @@ class Game {
 
         this.inputHandler = new InputHandler(this);
 
+        this.camera.initStartScreenCam();
         this.resize();
+        this.draw();
+
         this.init();
     }
 
     async init() {
         requestAnimationFrame((time) => this.loop(time));
-
-        await new Promise(resolve => setTimeout(resolve, 0));
-
-        this.camera.initStartScreenCam();
 
         const bgmPromise = audioManager.initBgm();
         const assetPromise = assetManager.preloadAll();
@@ -123,7 +122,10 @@ class Game {
     }
 
     loop(time) {
-        this.update(time);
+        const isPortrait = isMobile() && window.innerHeight > window.innerWidth;
+        if (!isPortrait) {
+            this.update(time);
+        }
         this.draw();
         requestAnimationFrame((t) => this.loop(t));
     }
