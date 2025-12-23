@@ -96,8 +96,10 @@ export const CONFIG = {
 
     // --- 开始界面 UI 设置 ---
     START_SCREEN_TITLE: '麻将贪吃蛇',
-    START_SCREEN_TITLE_SIZE: 200,
+    START_SCREEN_TITLE_SIZE: 235,
     START_SCREEN_TITLE_LETTER_SPACING: 30, // 每个字之间的额外像素间距 (可调)
+    START_SCREEN_TITLE_PULSE_SPEED: 0.002, // 标题缩放动画速度
+    START_SCREEN_TITLE_PULSE_AMPLITUDE: 0.05, // 标题缩放动画幅度 (0.05 表示 +/- 5%)
     START_SCREEN_BTN_WIDTH: 140,
     START_SCREEN_BTN_HEIGHT: 60,
     START_SCREEN_BTN_SPACING: 20,
@@ -105,7 +107,7 @@ export const CONFIG = {
     START_SCREEN_PROGRESS_HEIGHT: 30,
     START_SCREEN_BTN_FONT_SIZE: 24,
     START_SCREEN_VERTICAL_FOV: 20, // 开始界面垂直方向显示的格数 (越小格子越大)
-    START_SCREEN_CAM_SPEED: 1.5, // 移动速度 (格/秒)
+    START_SCREEN_CAM_SPEED: 1.2, // 移动速度 (格/秒)
 
     // Status display settings
     START_SCREEN_STATUS_FONT_SIZE: 16,
@@ -116,6 +118,7 @@ export const CONFIG = {
     // Camera settings
     CAMERA_FOLLOW_SPEED: 0.1, // Smooth follow interpolation factor
     CAMERA_VERTICAL_FOV: 13, // Number of vertical grids to show
+    CAMERA_VERTICAL_FOV_MOBILE: 9, // 手机端垂直方向显示的格数
     
     // Food settings
     MAX_FOOD_COUNT: 18,

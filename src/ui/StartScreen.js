@@ -24,17 +24,24 @@ export class StartScreen {
         ctx.fillStyle = 'rgba(44, 62, 80, 0.85)';
         ctx.fillRect(0, 0, width, height);
 
+        // 计算标题缩放动画 (仅在加载完成后)
+        let titleScale = 1;
+        if (this.isLoaded) {
+            const time = Date.now();
+            titleScale = 1 + Math.sin(time * CONFIG.START_SCREEN_TITLE_PULSE_SPEED) * CONFIG.START_SCREEN_TITLE_PULSE_AMPLITUDE;
+        }
+
         // 2. Title (逐字绘制以实现字间距控制)
         ctx.fillStyle = '#f1c40f';
-        ctx.font = `bold ${CONFIG.START_SCREEN_TITLE_SIZE * s}px Arial`;
+        ctx.font = `bold ${CONFIG.START_SCREEN_TITLE_SIZE * s * titleScale}px Arial`;
         ctx.textBaseline = 'middle';
         
         const title = CONFIG.START_SCREEN_TITLE;
-        const letterSpacing = CONFIG.START_SCREEN_TITLE_LETTER_SPACING * s;
+        const letterSpacing = CONFIG.START_SCREEN_TITLE_LETTER_SPACING * s * titleScale;
         
         // 分解为单个字符
         const chars = title.split('');
-        // 计算每个字的宽度
+        // 计算每个字的宽度 (由于字号变了，需要重新测量)
         const charWidths = chars.map(c => ctx.measureText(c).width);
         // 计算总宽度 (所有字宽 + 所有间距)
         const totalTitleWidth = charWidths.reduce((a, b) => a + b, 0) + (chars.length - 1) * letterSpacing;

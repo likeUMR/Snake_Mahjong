@@ -57,10 +57,7 @@ export class Camera {
     }
 
     handleResize(windowInnerHeight) {
-        let fov = CONFIG.CAMERA_VERTICAL_FOV;
-        if (isMobile()) {
-            fov = 10; // Mobile landscape needs a tighter FOV to keep tiles readable
-        }
+        let fov = isMobile() ? CONFIG.CAMERA_VERTICAL_FOV_MOBILE : CONFIG.CAMERA_VERTICAL_FOV;
         this.scale = windowInnerHeight / (fov * CONFIG.TILE_HEIGHT);
         this.uiScale = windowInnerHeight / 1080;
         if (isMobile()) this.uiScale *= 1.5; // Scale up UI for mobile
